@@ -35,7 +35,9 @@ use Throwable;
 
 class OpenApiGenerator
 {
+
     public const MEDIA_TYPE = 'application/vnd.api+json';
+
     /**
      * @throws \cebe\openapi\exceptions\TypeErrorException
      * @throws \cebe\openapi\exceptions\UnknownPropertyException
@@ -310,13 +312,18 @@ class OpenApiGenerator
 
                 $operationId = str_replace(".", "_", $route->getName());
 
-                $operation =  new Operation([
-                  "summary" => $this->getSummary($serverKey, $operationId) ?? $summary,
-                  "description" => $this->getDescription($serverKey, $operationId) ?? "",
+                $operation = new Operation([
+                  "summary" => $this->getSummary($serverKey,
+                      $operationId) ?? $summary,
+                  "description" => $this->getDescription($serverKey,
+                      $operationId) ?? "",
                   "operationId" => $operationId,
                   "parameters" => $parameters,
                   "responses" => $responses,
-                  "tags" => [ucfirst($schemaName), ...$this->getTags($serverKey, $operationId)]
+                  "tags" => [
+                    ucfirst($schemaName),
+                    ...$this->getTags($serverKey, $operationId),
+                  ],
                 ]);
                 if (in_array($method, ['POST', 'PATCH'])) {
                     $requestBody = ['$ref' => "#/components/requestBodies/".$schemaName."_".strtolower($method)];
@@ -595,10 +602,10 @@ class OpenApiGenerator
               'title' => 'attributes',
               'properties' => $fieldSchemas,
             ]),
-//               "relationships" => new OASchema([
-//                   'title' => 'relationships',
-//                   'properties' => !empty($relationSchemas) ? $relationSchemas : []
-//               ]),
+            "relationships" => new OASchema([
+              'title' => 'relationships',
+              'properties' => ! empty($relationSchemas) ? $relationSchemas : [],
+            ]),
             "links" => new OASchema([
               'title' => 'links',
               "nullable" => true,
@@ -606,7 +613,7 @@ class OpenApiGenerator
                 "self" => new OASchema([
                   "title" => "self",
                   'type' => Type::STRING,
-                    //"example" => $server->url([$schemaNamePlural,optional($model)->{$schema->id()->column() ?? optional($model)->getRouteKeyName()}]),
+                    "example" => $server->url([$schemaNamePlural,(string) optional($model)->{$schema->id()->column() ?? optional($model)->getRouteKeyName()}]),
                 ]),
               ],
             ]),
@@ -781,6 +788,8 @@ class OpenApiGenerator
      */
     protected function getTags($serverKey, $operationId): array
     {
-        return config("openapi.servers.$serverKey.operations.$operationId.extra_tags", []);
+        return config("openapi.servers.$serverKey.operations.$operationId.extra_tags",
+          []);
     }
+
 }

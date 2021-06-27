@@ -26,6 +26,7 @@ abstract class TestCase extends BaseTestCase
                 ->prefix('v1')
                 ->resources(function ($server) {
                     $server->resource('posts', JsonApiController::class);
+                    $server->resource('categories', JsonApiController::class);
                 });
         });
     }

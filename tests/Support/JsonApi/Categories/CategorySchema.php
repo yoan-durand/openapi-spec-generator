@@ -1,9 +1,10 @@
 <?php
 
-namespace LaravelJsonApi\OpenApiSpec\Tests\Support\JsonApi\Posts;
+namespace LaravelJsonApi\OpenApiSpec\Tests\Support\JsonApi\Categories;
 
 use LaravelJsonApi\Eloquent\Fields\Relations\BelongsTo;
 use LaravelJsonApi\Eloquent\Fields\Relations\HasMany;
+use LaravelJsonApi\OpenApiSpec\Tests\Support\Models\Category;
 use LaravelJsonApi\OpenApiSpec\Tests\Support\Models\Post;
 use LaravelJsonApi\Eloquent\Contracts\Paginator;
 use LaravelJsonApi\Eloquent\Fields\DateTime;
@@ -13,7 +14,7 @@ use LaravelJsonApi\Eloquent\Filters\WhereIdIn;
 use LaravelJsonApi\Eloquent\Pagination\PagePagination;
 use LaravelJsonApi\Eloquent\Schema;
 
-class PostSchema extends Schema
+class CategorySchema extends Schema
 {
 
     /**
@@ -21,7 +22,7 @@ class PostSchema extends Schema
      *
      * @var string
      */
-    public static string $model = Post::class;
+    public static string $model = Category::class;
 
     /**
      * Get the resource fields.
@@ -32,9 +33,8 @@ class PostSchema extends Schema
     {
         return [
             ID::make(),
-            Str::make('title')->sortable(),
-            BelongsTo::make('category'),
-            HasMany::make('comments'),
+            Str::make('name')->sortable(),
+            HasMany::make('posts'),
             DateTime::make('createdAt')->sortable()->readOnly(),
             DateTime::make('updatedAt')->sortable()->readOnly(),
         ];

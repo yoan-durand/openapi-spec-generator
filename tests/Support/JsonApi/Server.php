@@ -8,7 +8,7 @@ class Server extends BaseServer
 {
     /**
      * The base URI namespace for this server.
-     * 
+     *
      * @return string
      */
     protected function baseUri(): string
@@ -35,6 +35,7 @@ class Server extends BaseServer
     {
         return [
             Posts\PostSchema::class,
+            Categories\CategorySchema::class,
         ];
     }
 }
