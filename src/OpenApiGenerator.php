@@ -493,7 +493,7 @@ class OpenApiGenerator
                         'title' => 'links',
                         'type' => Type::OBJECT,
                         "allOf" => [$relationLinkSchema],
-                        "example" => $server->url([$fieldName,optional($model)->{$schema->id()->column() ?? optional($model)->getRouteKeyName()}]),
+                        "example" => $server->url([$fieldName,(string)optional($model)->{$schema->id()->column() ?? optional($model)->getRouteKeyName()}]),
                     ]),
                     'data' => new Schema([
                         'title' => 'data',
