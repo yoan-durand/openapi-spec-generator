@@ -36,6 +36,7 @@ class Server extends BaseServer
         return [
             Posts\PostSchema::class,
             Categories\CategorySchema::class,
+            Comments\CommentSchema::class,
         ];
     }
 }
