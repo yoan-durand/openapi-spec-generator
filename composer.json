@@ -1,6 +1,18 @@
 {
     "name": "byteit/openapi-spec-generator",
     "description": "Creates Open API spec for a Laravel JSON:API",
+    "authors": [
+        {
+            "name": "Glenn Jacobs",
+            "homepage": "https://github.com/glennjacobs",
+            "role": "Original author"
+        },
+        {
+            "name": "Johannes Kees",
+            "homepage": "https://github.com/byte-it",
+            "email": "johannes@lets-byte.it"
+        }
+    ],
     "license": "Apache-2.0",
     "require": {
         "php": "^7.4|^8.0",
