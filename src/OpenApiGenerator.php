@@ -372,7 +372,7 @@ class OpenApiGenerator
                     );
 
                     $allSchemas[$schemaName] = new OASchema([
-                      'title' => $schemaName,
+                      'title' => ucfirst($schemaName),
                       'properties' => [
                         "jsonapi" => new OASchema([
                           'title' => 'jsonapi',
@@ -400,7 +400,7 @@ class OpenApiGenerator
                     ]);
 
                     $allSchemas[$schemaName."_data"] = new OASchema([
-                      'title' => $schemaName."_data",
+                      'title' => ucfirst($schemaName)." Data",
                       'properties' => $schemaData->__get('properties'),
                     ]);
                 }
@@ -628,7 +628,7 @@ class OpenApiGenerator
     {
         return [
           'unauthorized' => new OASchema([
-            'title' => "unauthorized_error",
+            'title' => "401 Unauthorized",
             "type" => Type::OBJECT,
             "properties" => [
               "errors" => new OASchema([
@@ -655,7 +655,7 @@ class OpenApiGenerator
             ],
           ]),
           'forbidden' => new OASchema([
-            'title' => "unauthorized_error",
+            'title' => "403 Forbidden",
             "type" => Type::OBJECT,
             "properties" => [
               "errors" => new OASchema([
