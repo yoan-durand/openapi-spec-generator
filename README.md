@@ -26,7 +26,7 @@ Designed to work with [Laravel JSON:API](https://laraveljsonapi.io/)
 
 Install package
 ```
-composer require neondigital/openapi-spec-generator
+composer require byteit/openapi-spec-generator
 ```
 
 Publish the config file
