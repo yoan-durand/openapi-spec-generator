@@ -1,6 +1,7 @@
 {
     "name": "byteit/openapi-spec-generator",
     "description": "Creates Open API spec for a Laravel JSON:API",
+    "version": "0.0.1",
     "authors": [
         {
             "name": "Glenn Jacobs",
