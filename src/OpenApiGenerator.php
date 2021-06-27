@@ -13,14 +13,16 @@ use cebe\openapi\spec\Reference;
 use cebe\openapi\spec\RequestBody;
 use cebe\openapi\spec\Response;
 use cebe\openapi\spec\Responses;
-use cebe\openapi\spec\Schema;
-use cebe\openapi\spec\Server;
-use cebe\openapi\spec\ServerVariable;
+use cebe\openapi\spec\Schema as OASchema;
+use cebe\openapi\spec\Server as OAServer;
+use cebe\openapi\spec\ServerVariable as OAServerVariable;
 use cebe\openapi\spec\Type;
 use cebe\openapi\Writer;
 use Exception;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str as StrStr;
+use LaravelJsonApi\Contracts\Schema\Schema;
+use LaravelJsonApi\Contracts\Server\Server;
 use LaravelJsonApi\Eloquent\Fields\Boolean;
 use LaravelJsonApi\Eloquent\Fields\DateTime;
 use LaravelJsonApi\Eloquent\Fields\ID;
@@ -33,7 +35,7 @@ use Throwable;
 
 class OpenApiGenerator
 {
-
+    public const MEDIA_TYPE = 'application/vnd.api+json';
     /**
      * @throws \cebe\openapi\exceptions\TypeErrorException
      * @throws \cebe\openapi\exceptions\UnknownPropertyException
@@ -41,31 +43,32 @@ class OpenApiGenerator
      */
     public function generate($serverKey): string
     {
-        $server = config('jsonapi.servers.'.$serverKey);
+        $serverClass = config("jsonapi.servers.$serverKey");
 
         // Initial OpenAPI object
         $openapi = new OpenApi([
           'openapi' => '3.0.2',
           'info' => [
-            'title' => config('openapi.servers.'.$serverKey.'.info.title'),
-            'description' => config('openapi.servers.'.$serverKey.'.info.description'),
-            'version' => config('openapi.servers.'.$serverKey.'.info.version'),
+            'title' => config("openapi.servers.$serverKey.info.title"),
+            'description' => config("openapi.servers.$serverKey.info.description"),
+            'version' => config("openapi.servers.$serverKey.info.version"),
           ],
           'paths' => [],
           "components" => $this->getDefaultComponents(),
-          'x-tagGroups' => config('openapi.servers.'.$serverKey.'.tag_groups'),
+          'x-tagGroups' => config("openapi.servers.$serverKey.tag_groups"),
         ]);
 
         // Load JSON:API Server
-        $jsonapiServer = new $server(app(), $serverKey);
+        /** @var \LaravelJsonApi\Contracts\Server\Server $jsonapiServer */
+        $jsonapiServer = new $serverClass(app(), $serverKey);
 
         // Add server to OpenAPI spec
         $openapi->__set('servers', [
-          new Server([
+          new OAServer([
             'url' => "{serverURL}",
             "description" => "provide your server URL",
             "variables" => [
-              "serverURL" => new ServerVariable([
+              "serverURL" => new OAServerVariable([
                 "default" => $jsonapiServer->url(""),
                 "description" => "path for server",
               ]),
@@ -78,11 +81,12 @@ class OpenApiGenerator
         $allParameters = [];
 
         // Get all Laravel routes associated with this JSON:API Server
-        $routes = collect(Route::getRoutes()->getRoutes())
-          ->filter(function (\Illuminate\Routing\Route $route) use ($serverKey
-          ) {
-              return StrStr::contains($route->getName(), $serverKey);
-          });
+        $routes =
+          collect(Route::getRoutes()->getRoutes())->filter(
+            function (\Illuminate\Routing\Route $route) use ($serverKey) {
+                return StrStr::contains($route->getName(), $serverKey);
+            }
+          );
 
         $routeMethods = [];
 
@@ -102,9 +106,7 @@ class OpenApiGenerator
               ->plural()
               ->replace('_', '-');
 
-            $sh = $jsonapiServer->schemas()->schemaFor($schemaName);
-            $schema = new $sh($jsonapiServer);
-            //$schema->withSchemas($server->schemas()); // method doesn't exist anymore. can't find out what it did
+            $schema = $jsonapiServer->schemas()->schemaFor($schemaName);
 
             foreach ($route->methods() as $method) {
                 $parameters = [];
@@ -116,22 +118,24 @@ class OpenApiGenerator
 
                 if (($method === 'GET') && ! $requiresPath) {
                     foreach ($schema->filters() as $filter) {
+                        $examples = $schema::model()::all()
+                          ->pluck($filter->key())
+                          ->mapWithKeys(function ($f) {
+                              return [
+                                $f => new Example([
+                                  'value' => $f,
+                                ]),
+                              ];
+                          })
+                          ->toArray();
+
                         $parameters[] = new Parameter([
                           'name' => "filter[{$filter->key()}]",
                           'in' => 'query',
                           'required' => false,
                           'allowEmptyValue' => true,
-                          'examples' => $schema::model()::all()
-                            ->pluck($filter->key())
-                            ->mapWithKeys(function ($f) {
-                                return [
-                                  $f => new Example([
-                                    'value' => $f,
-                                  ]),
-                                ];
-                            })
-                            ->toArray(),
-                          'schema' => new Schema([
+                          'examples' => $examples,
+                          'schema' => new OASchema([
                             "type" => Type::STRING,
                           ]),
                         ]);
@@ -143,7 +147,7 @@ class OpenApiGenerator
                                "pageLimit",
                                "pageOffset",
                              ] as $parameter) {
-                        $parameters[] = ['$ref' => "#/components/parameters/".$parameter];
+                        $parameters[] = ['$ref' => "#/components/parameters/$parameter"];
                     }
                 }
 
@@ -152,10 +156,10 @@ class OpenApiGenerator
                       'description' => "$method $schemaName",
                       "content" => [
                         "application/vnd.api+json" => new MediaType([
-                          "schema" => new Schema([
+                          "schema" => new OASchema([
                             "oneOf" => [
                               new Reference([
-                                '$ref' => "#/components/schemas/".$schemaName,
+                                '$ref' => "#/components/schemas/$schemaName",
                               ]),
                             ],
                           ]),
@@ -172,11 +176,11 @@ class OpenApiGenerator
                     $responses->addResponse(201, new Response([
                       'description' => "$method $schemaName",
                       "content" => [
-                        "application/vnd.api+json" => new MediaType([
-                          "schema" => new Schema([
+                        self::MEDIA_TYPE => new MediaType([
+                          "schema" => new OASchema([
                             "oneOf" => [
                               new Reference([
-                                '$ref' => "#/components/schemas/".$schemaName,
+                                '$ref' => "#/components/schemas/$schemaName",
                               ]),
                             ],
                           ]),
@@ -189,11 +193,11 @@ class OpenApiGenerator
                     $responses->addResponse(202, new Response([
                       'description' => "$method $schemaName",
                       "content" => [
-                        "application/vnd.api+json" => new MediaType([
-                          "schema" => new Schema([
+                        self::MEDIA_TYPE => new MediaType([
+                          "schema" => new OASchema([
                             "oneOf" => [
                               new Reference([
-                                '$ref' => "#/components/schemas/".$schemaName,
+                                '$ref' => "#/components/schemas/$schemaName",
                               ]),
                             ],
                           ]),
@@ -205,8 +209,8 @@ class OpenApiGenerator
                 $responses->addResponse(401, new Response([
                   'description' => "Unauthorized Action",
                   "content" => [
-                    "application/vnd.api+json" => new MediaType([
-                      "schema" => new Schema([
+                    self::MEDIA_TYPE => new MediaType([
+                      "schema" => new OASchema([
                         "oneOf" => [
                           new Reference([
                             '$ref' => "#/components/schemas/unauthorized",
@@ -220,8 +224,8 @@ class OpenApiGenerator
                 $responses->addResponse(403, new Response([
                   'description' => "Forbidden Action",
                   "content" => [
-                    "application/vnd.api+json" => new MediaType([
-                      "schema" => new Schema([
+                    self::MEDIA_TYPE => new MediaType([
+                      "schema" => new OASchema([
                         "oneOf" => [
                           new Reference([
                             '$ref' => "#/components/schemas/forbidden",
@@ -235,8 +239,8 @@ class OpenApiGenerator
                 $responses->addResponse(404, new Response([
                   'description' => "Content Not Found",
                   "content" => [
-                    "application/vnd.api+json" => new MediaType([
-                      "schema" => new Schema([
+                    self::MEDIA_TYPE => new MediaType([
+                      "schema" => new OASchema([
                         "oneOf" => [
                           new Reference([
                             '$ref' => "#/components/schemas/not_found",
@@ -265,7 +269,7 @@ class OpenApiGenerator
                             ]),
                           ];
                       })->toArray(),
-                      'schema' => new Schema([
+                      'schema' => new OASchema([
                         'title' => $schemaName,
                       ]),
                     ]);
@@ -276,23 +280,23 @@ class OpenApiGenerator
 
                 switch ($action) {
                     case "index":
-                        $summary = "Get all ".$schemaName;
+                        $summary = "Get all $schemaName";
                         break;
 
                     case "show":
-                        $summary = "Get a ".$schemaName;
+                        $summary = "Get a $schemaName";
                         break;
 
                     case "store":
-                        $summary = "Create a new ".$schemaName;
+                        $summary = "Create a new $schemaName";
                         break;
 
                     case "update":
-                        $summary = "Update the ".$schemaName;
+                        $summary = "Update the $schemaName";
                         break;
 
                     case "delete":
-                        $summary = "Delete the ".$schemaName;
+                        $summary = "Delete the $schemaName";
                         break;
 
                     default:
@@ -306,32 +310,19 @@ class OpenApiGenerator
 
                 $operationId = str_replace(".", "_", $route->getName());
 
+                $operation =  new Operation([
+                  "summary" => $this->getSummary($serverKey, $operationId) ?? $summary,
+                  "description" => $this->getDescription($serverKey, $operationId) ?? "",
+                  "operationId" => $operationId,
+                  "parameters" => $parameters,
+                  "responses" => $responses,
+                  "tags" => [ucfirst($schemaName), ...$this->getTags($serverKey, $operationId)]
+                ]);
                 if (in_array($method, ['POST', 'PATCH'])) {
                     $requestBody = ['$ref' => "#/components/requestBodies/".$schemaName."_".strtolower($method)];
-
-                    $routeMethods[$routeUri][strtolower($method)] = new Operation([
-                      "summary" => config('openapi.servers.'.$serverKey.'.operations.'.$operationId.".summary") ?? $summary,
-                      "description" => config('openapi.servers.'.$serverKey.'.operations.'.$operationId.".description") ?? "",
-                      "operationId" => $operationId,
-                      "parameters" => $parameters,
-                      "responses" => $responses,
-                      "requestBody" => $requestBody,
-                      "tags" => array_merge([ucfirst($schemaName)],
-                        config('openapi.servers.'.$serverKey.'.operations.'.$operationId.".extra_tags",
-                          [])),
-                    ]);
-                } else {
-                    $routeMethods[$routeUri][strtolower($method)] = new Operation([
-                      "summary" => config('openapi.servers.'.$serverKey.'.operations.'.$operationId.".summary") ?? $summary,
-                      "description" => config('openapi.servers.'.$serverKey.'.operations.'.$operationId.".description") ?? "",
-                      "operationId" => $operationId,
-                      "parameters" => $parameters,
-                      "responses" => $responses,
-                      "tags" => array_merge([ucfirst($schemaName)],
-                        config('openapi.servers.'.$serverKey.'.operations.'.$operationId.".extra_tags",
-                          [])),
-                    ]);
+                    $operation->requestBody = $requestBody;
                 }
+                $routeMethods[$routeUri][strtolower($method)] = $operation;
             }
         }
 
@@ -364,7 +355,7 @@ class OpenApiGenerator
                         }
                     }
 
-                    $schemaData = $this->getSwaggerSchema(
+                    $schemaData = $this->getOpenApiSchema(
                       $jsonapiServer,
                       $schema,
                       $schemaName,
@@ -373,27 +364,27 @@ class OpenApiGenerator
                       $allSchemas
                     );
 
-                    $allSchemas[$schemaName] = new Schema([
+                    $allSchemas[$schemaName] = new OASchema([
                       'title' => $schemaName,
                       'properties' => [
-                        "jsonapi" => new Schema([
+                        "jsonapi" => new OASchema([
                           'title' => 'jsonapi',
                           'properties' => [
-                            "version" => new Schema([
+                            "version" => new OASchema([
                               "title" => "version",
                               'type' => Type::STRING,
                               "example" => "1.0",
                             ]),
                           ],
                         ]),
-                        "data" => new Schema([
+                        "data" => new OASchema([
                           "oneOf" => [
                             new Reference([
                               '$ref' => "#/components/schemas/".$schemaNamePlural."_data",
                             ]),
                           ],
                         ]),
-                          // "included" => new Schema([
+                          // "included" => new OASchema([
                           //     "type" => Type::OBJECT,
                           //     "title" => "included",
                           //     "properties" => $includedSchemas
@@ -401,16 +392,16 @@ class OpenApiGenerator
                       ],
                     ]);
 
-                    $allSchemas[$schemaName."_data"] = new Schema([
+                    $allSchemas[$schemaName."_data"] = new OASchema([
                       'title' => $schemaName."_data",
                       'properties' => $schemaData->__get('properties'),
                     ]);
                 }
 
-                if ( ! empty($schema->fields()) && $method !== 'GET') {
+                if ($method !== 'GET' && ! empty($schema->fields())) {
                     $contents = [];
                     foreach ($schema->fields() as $field) {
-                        $contents[$field->name()] = new Schema([
+                        $contents[$field->name()] = new OASchema([
                           'title' => $field->name(),
                           'type' => 'string',
                         ]);
@@ -419,9 +410,9 @@ class OpenApiGenerator
                       'description' => $schemaName."_".strtolower($method),
                       'content' => [
                         'application/vnd.api+json' => new MediaType([
-                          "schema" => new Schema([
+                          "schema" => new OASchema([
                             "properties" => [
-                              "data" => new Schema([
+                              "data" => new OASchema([
                                 "title" => 'data',
                                 "type" => Type::OBJECT,
                                 "oneOf" => [
@@ -468,9 +459,9 @@ class OpenApiGenerator
     /**
      * @throws \cebe\openapi\exceptions\TypeErrorException
      */
-    private function getSwaggerSchema(
-      $server,
-      $schema,
+    private function getOpenApiSchema(
+      Server $server,
+      Schema $schema,
       string $schemaName,
       string $schemaNamePlural,
       string $method,
@@ -482,14 +473,16 @@ class OpenApiGenerator
         }
         $fieldSchemas = [];
         $relationSchemas = [];
-        $model = $schema::model();
-        $models = $model::all();
-        $model = $model::first();
+
+        $modelClass = $schema::model();
+        $models = $modelClass::all();
+        $model = $modelClass::first();
+
         foreach ($schema->fields() as $field) {
             if ($method === 'DELETE') {
                 continue;
             }
-            $fieldSchema = new Schema([
+            $fieldSchema = new OASchema([
               'title' => $field->name(),
               "type" => Type::OBJECT,
             ]);
@@ -518,58 +511,61 @@ class OpenApiGenerator
                 }
             }
             if ($field instanceof Relation) {
-                $relationSchema = new Schema([
+                $relationSchema = new OASchema([
                   'title' => $field->name(),
                 ]);
-                $relationLinkSchema = new Schema([
+                $relationLinkSchema = new OASchema([
                   'title' => $field->name(),
                 ]);
-                $relationDataSchema = new Schema([
+                $relationDataSchema = new OASchema([
                   'title' => $field->name(),
                 ]);
                 $fieldName = \LaravelJsonApi\Core\Support\Str::dasherize(
                   \LaravelJsonApi\Core\Support\Str::plural($field->relationName())
                 );
                 $relationLinkSchema->__set('properties', [
-                  'related' => new Schema([
+                  'related' => new OASchema([
                     'title' => 'related',
                     "type" => Type::STRING,
                   ]),
-                  'self' => new Schema([
+                  'self' => new OASchema([
                     'title' => 'self',
                     "type" => Type::STRING,
                   ]),
                 ]);
                 $relationDataSchema->__set('properties', [
-                  'type' => new Schema([
+                  'type' => new OASchema([
                     'title' => 'type',
                     "type" => Type::STRING,
                     "example" => $fieldName,
                   ]),
-                  'id' => new Schema([
+                  'id' => new OASchema([
                     'title' => 'id',
                     "type" => Type::STRING,
-                    "example" => optional($model)->{$schema->id()
+                    "example" => (string) optional($model)->{$schema->id()
                       ->column() ?? optional($model)->getRouteKeyName()},
                   ]),
                 ]);
                 $relationSchema->__set('properties', [
-                  'links' => new Schema([
+                  'links' => new OASchema([
                     'title' => 'links',
                     'type' => Type::OBJECT,
                     "allOf" => [$relationLinkSchema],
-                    "example" => $server->url([$fieldName,
+                    "example" => $server->url([
+                      $fieldName,
                       (string) optional($model)->{$schema->id()
                         ->column() ?? optional($model)->getRouteKeyName()},
                     ]),
                   ]),
-                  'data' => new Schema([
+                  'data' => new OASchema([
                     'title' => 'data',
                     "allOf" => [$relationDataSchema],
                   ]),
                 ]);
-                if ($field instanceof ToOne && in_array($fieldName,
-                    $server->schemas()->types())) {
+                if (
+                  $field instanceof ToOne
+                  && in_array($fieldName, $server->schemas()->types(), true)
+                ) {
                     $fieldSchema->__set('oneOf', [
                       $relationSchema,
                     ]);
@@ -581,33 +577,33 @@ class OpenApiGenerator
             unset($fieldSchema);
         }
 
-        return new Schema([
+        return new OASchema([
           "type" => Type::OBJECT,
           "title" => "data",
           "properties" => [
-            "type" => new Schema([
+            "type" => new OASchema([
               'title' => $schemaName,
               'type' => Type::STRING,
               'example' => $schemaNamePlural,
             ]),
-            "id" => new Schema([
+            "id" => new OASchema([
               'title' => 'id',
               'type' => Type::STRING,
               "example" => optional($model)->id,
             ]),
-            "attributes" => new Schema([
+            "attributes" => new OASchema([
               'title' => 'attributes',
               'properties' => $fieldSchemas,
             ]),
-              // "relationships" => new Schema([
-              //     'title' => 'relationships',
-              //     'properties' => !empty($relationSchemas) ? $relationSchemas : []
-              // ]),
-            "links" => new Schema([
+//               "relationships" => new OASchema([
+//                   'title' => 'relationships',
+//                   'properties' => !empty($relationSchemas) ? $relationSchemas : []
+//               ]),
+            "links" => new OASchema([
               'title' => 'links',
               "nullable" => true,
               'properties' => [
-                "self" => new Schema([
+                "self" => new OASchema([
                   "title" => "self",
                   'type' => Type::STRING,
                     //"example" => $server->url([$schemaNamePlural,optional($model)->{$schema->id()->column() ?? optional($model)->getRouteKeyName()}]),
@@ -624,25 +620,25 @@ class OpenApiGenerator
     private function getDefaultSchema(): array
     {
         return [
-          'unauthorized' => new Schema([
+          'unauthorized' => new OASchema([
             'title' => "unauthorized_error",
             "type" => Type::OBJECT,
             "properties" => [
-              "errors" => new Schema([
+              "errors" => new OASchema([
                 'title' => "errors",
                 "type" => Type::OBJECT,
                 "properties" => [
-                  "detail" => new Schema([
+                  "detail" => new OASchema([
                     'title' => "detail",
                     "type" => Type::STRING,
                     "example" => 'Unauthenticated.',
                   ]),
-                  "status" => new Schema([
+                  "status" => new OASchema([
                     'title' => "status",
                     "type" => Type::STRING,
                     "example" => '401',
                   ]),
-                  "title" => new Schema([
+                  "title" => new OASchema([
                     'title' => "title",
                     "type" => Type::STRING,
                     "example" => 'Unauthorized',
@@ -651,25 +647,25 @@ class OpenApiGenerator
               ]),
             ],
           ]),
-          'forbidden' => new Schema([
+          'forbidden' => new OASchema([
             'title' => "unauthorized_error",
             "type" => Type::OBJECT,
             "properties" => [
-              "errors" => new Schema([
+              "errors" => new OASchema([
                 'title' => "errors",
                 "type" => Type::OBJECT,
                 "properties" => [
-                  "detail" => new Schema([
+                  "detail" => new OASchema([
                     'title' => "detail",
                     "type" => Type::STRING,
                     "example" => 'Forbidden.',
                   ]),
-                  "status" => new Schema([
+                  "status" => new OASchema([
                     'title' => "status",
                     "type" => Type::STRING,
                     "example" => '403',
                   ]),
-                  "title" => new Schema([
+                  "title" => new OASchema([
                     'title' => "title",
                     "type" => Type::STRING,
                     "example" => 'Forbidden',
@@ -678,20 +674,20 @@ class OpenApiGenerator
               ]),
             ],
           ]),
-          'not_found' => new Schema([
+          'not_found' => new OASchema([
             'title' => "404 Not Found",
             "type" => Type::OBJECT,
             "properties" => [
-              "errors" => new Schema([
+              "errors" => new OASchema([
                 'title' => "errors",
                 "type" => Type::OBJECT,
                 "properties" => [
-                  "status" => new Schema([
+                  "status" => new OASchema([
                     'title' => "status",
                     "type" => Type::STRING,
                     "example" => '404',
                   ]),
-                  "title" => new Schema([
+                  "title" => new OASchema([
                     'title' => "title",
                     "type" => Type::STRING,
                     "example" => 'Not Found',
@@ -755,4 +751,36 @@ class OpenApiGenerator
         ]);
     }
 
+    /**
+     * @param $serverKey
+     * @param $operationId
+     *
+     * @return string|null
+     */
+    protected function getSummary($serverKey, $operationId): ?string
+    {
+        return config("openapi.servers.$serverKey.operations.$operationId.summary");
+    }
+
+    /**
+     * @param $serverKey
+     * @param $operationId
+     *
+     * @return string|null
+     */
+    protected function getDescription($serverKey, $operationId): ?string
+    {
+        return config("openapi.servers.$serverKey.operations.$operationId.description");
+    }
+
+    /**
+     * @param $serverKey
+     * @param $operationId
+     *
+     * @return string[]
+     */
+    protected function getTags($serverKey, $operationId): array
+    {
+        return config("openapi.servers.$serverKey.operations.$operationId.extra_tags", []);
+    }
 }

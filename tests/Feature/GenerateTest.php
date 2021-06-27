@@ -3,9 +3,9 @@
 namespace LaravelJsonApi\OpenApiSpec\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use LaravelJsonApi\OpenApiSpec\Facades\GeneratorFacade;
 use LaravelJsonApi\OpenApiSpec\Tests\Support\Database\Seeders\DatabaseSeeder;
 use LaravelJsonApi\OpenApiSpec\Tests\TestCase;
-use OpenApiGenerator;
 use Symfony\Component\Yaml\Yaml;
 
 class GenerateTest extends TestCase
@@ -21,7 +21,7 @@ class GenerateTest extends TestCase
 
     public function test_spec_is_yaml()
     {
-        $openapiYaml = OpenApiGenerator::generate('v1');
+        $openapiYaml = GeneratorFacade::generate('v1');
 
         $spec = Yaml::parse($openapiYaml);
 
@@ -30,7 +30,7 @@ class GenerateTest extends TestCase
 
     public function test_spec_file_generated()
     {
-        OpenApiGenerator::generate('v1');
+        GeneratorFacade::generate('v1');
 
         $openapiYaml = \Storage::get('v1_openapi.yaml');
 
