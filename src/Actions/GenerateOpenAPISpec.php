@@ -43,7 +43,8 @@ class GenerateOpenAPISpec
     protected array $schemas = [];
     protected array $requests = [];
     protected array $parameters = [];
-
+    protected array $routeMethods = [];
+    protected Server $jsonapiServer;
     public function __construct(string $serverKey)
     {
         $this->serverKey = $serverKey;
@@ -73,8 +74,7 @@ class GenerateOpenAPISpec
         ]);
 
         // Load JSON:API Server
-        /** @var \LaravelJsonApi\Contracts\Server\Server $jsonapiServer */
-        $jsonapiServer = new $serverClass(app(), $serverKey);
+        $this->jsonapiServer = new $serverClass(app(), $serverKey);
 
         // Add server to OpenAPI spec
         $openapi->__set('servers', [
@@ -83,7 +83,7 @@ class GenerateOpenAPISpec
             "description" => "provide your server URL",
             "variables" => [
               "serverURL" => new OAServerVariable([
-                "default" => $jsonapiServer->url(""),
+                "default" => $this->jsonapiServer->url(""),
                 "description" => "path for server",
               ]),
             ],
@@ -102,41 +102,19 @@ class GenerateOpenAPISpec
             }
           );
 
-        $routeMethods = [];
-
         foreach ($this->routes as $route) {
-            $uri = $route->uri;
-            $routeUri = str_replace($route->getPrefix(), '', $uri);
 
-            $requiresPath = \Str::contains($routeUri, '{');
-
-            if ($requiresPath) {
-                $schemaName = \Str::between($routeUri, '{', '}');
-            } else {
-                $schemaName = str_replace('/', '', $routeUri);
-            }
-
-            $schemaName = (string) \Str::of($schemaName)
-              ->plural()
-              ->replace('_', '-');
-
-            $schema = $jsonapiServer->schemas()->schemaFor($schemaName);
 
             foreach ($route->methods() as $method) {
-                $routeMethods[$routeUri][strtolower($method)] = $this->generateOperationForMethod(
+                $this->generateOperationForMethod(
                   $method,
-                  $requiresPath,
-                  $schema,
-                  $schemaName,
                   $route,
-                  $routeMethods,
-                  $routeUri,
                 );
             }
         }
 
-        foreach ($jsonapiServer->schemas()->types() as $schemaName) {
-            $schema = $jsonapiServer->schemas()->schemaFor($schemaName);
+        foreach ($this->jsonapiServer->schemas()->types() as $schemaName) {
+            $schema = $this->jsonapiServer->schemas()->schemaFor($schemaName);
             $schemaNamePlural = (string) \Str::of($schemaName)
               ->plural()
               ->replace('_', '-');
@@ -165,7 +143,6 @@ class GenerateOpenAPISpec
                     }
 
                     $schemaData = $this->getOpenApiSchema(
-                      $jsonapiServer,
                       $schema,
                       $schemaName,
                       $schemaNamePlural,
@@ -240,7 +217,7 @@ class GenerateOpenAPISpec
         }
 
         // Add paths to OpenApi spec
-        foreach ($routeMethods as $key => $method) {
+        foreach ($this->routeMethods as $key => $method) {
             $openapi->paths[$key] = new PathItem(array_merge([
               "description" => $schemaName,
             ], $method));
@@ -261,7 +238,6 @@ class GenerateOpenAPISpec
      * @throws \cebe\openapi\exceptions\TypeErrorException
      */
     private function getOpenApiSchema(
-      Server $server,
       Schema $schema,
       string $schemaName,
       string $schemaNamePlural,
@@ -351,7 +327,7 @@ class GenerateOpenAPISpec
                     'title' => 'links',
                     'type' => Type::OBJECT,
                     "allOf" => [$relationLinkSchema],
-                    "example" => $server->url([
+                    "example" => $this->jsonapiServer->url([
                       $fieldName,
                       (string) optional($model)->{$schema->id()
                         ->column() ?? optional($model)->getRouteKeyName()},
@@ -364,7 +340,7 @@ class GenerateOpenAPISpec
                 ]);
                 if (
                   $field instanceof ToOne
-                  && in_array($fieldName, $server->schemas()->types(), true)
+                  && in_array($fieldName, $this->jsonapiServer->schemas()->types(), true)
                 ) {
                     $fieldSchema->__set('oneOf', [
                       $relationSchema,
@@ -406,7 +382,7 @@ class GenerateOpenAPISpec
                 "self" => new OASchema([
                   "title" => "self",
                   'type' => Type::STRING,
-                  "example" => $server->url([$schemaNamePlural,(string) optional($model)->{$schema->id()->column() ?? optional($model)->getRouteKeyName()}]),
+                  "example" => $this->jsonapiServer->url([$schemaNamePlural,(string) optional($model)->{$schema->id()->column() ?? optional($model)->getRouteKeyName()}]),
                 ]),
               ],
             ]),
@@ -587,31 +563,49 @@ class GenerateOpenAPISpec
 
     /**
      * @param  mixed  $method
-     * @param  bool  $requiresPath
-     * @param  \LaravelJsonApi\Contracts\Schema\Schema  $schema
-     * @param  string  $schemaName
      * @param  mixed  $route
-     * @param  array  $routeMethods
-     * @param  array|string  $routeUri
      *
-     * @return \cebe\openapi\spec\Operation|null
      * @throws \cebe\openapi\exceptions\TypeErrorException
      */
     protected function generateOperationForMethod(
       mixed $method,
-      bool $requiresPath,
-      Schema $schema,
-      string $schemaName,
       \Illuminate\Routing\Route $route,
-      array $routeMethods,
-      array|string $routeUri
-    ): ?Operation {
+    ): void {
         $serverKey = $this->serverKey;
+        $routeNameSegments = explode('.', $route->getName());
+
+        $index = array_search($serverKey, $routeNameSegments);
+        $routeNameSegments = array_slice($routeNameSegments, $index + 1);
+
+        [$schemaName, $action] = $routeNameSegments;
+
+        $schemaName = (string) \Str::of($schemaName)
+          ->plural()
+          ->replace('_', '-');
+
+        $schema = $this->jsonapiServer->schemas()->schemaFor($schemaName);
+
+        if($schema->isRelationship($action)){
+            // Drop out, dont know yet what todo
+
+            return;
+        }
+
+        $operationId = collect($routeNameSegments)->join('_');
+
+        $uri = $route->uri();
+
+        $routeUri = str_replace($route->getPrefix(), '', $uri);
+
+        $requiresPath = \Str::contains($routeUri, '{');
+
+
         $parameters = [];
         $responses = new Responses([]);
 
+
         if ($method === 'HEAD') {
-            return null;
+            return;
         }
 
         if (($method === 'GET') && ! $requiresPath) {
@@ -773,9 +767,6 @@ class GenerateOpenAPISpec
             ]);
         }
 
-        // Make nice summaries
-        $action = StrStr::of($route->getName())->explode('.')->last();
-
         switch ($action) {
             case "index":
                 $summary = "Get all $schemaName";
@@ -802,11 +793,6 @@ class GenerateOpenAPISpec
                 break;
         }
 
-        if ( ! isset($routeMethods[$routeUri])) {
-            $routeMethods[$routeUri] = [];
-        }
-
-        $operationId = str_replace(".", "_", $route->getName());
 
         $operation = new Operation([
           "summary" => $this->getSummary($serverKey,
@@ -825,6 +811,9 @@ class GenerateOpenAPISpec
             $requestBody = ['$ref' => "#/components/requestBodies/".$schemaName."_".strtolower($method)];
             $operation->requestBody = $requestBody;
         }
-        return $operation;
+        if ( ! isset($this->routeMethods[$routeUri])) {
+            $this->routeMethods[$routeUri] = [];
+        }
+        $this->routeMethods[$routeUri][strtolower($method)] = $operation;
     }
 }

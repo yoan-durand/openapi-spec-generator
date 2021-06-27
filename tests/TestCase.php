@@ -25,7 +25,9 @@ abstract class TestCase extends BaseTestCase
             $jsonApiRoute->server('v1')
                 ->prefix('v1')
                 ->resources(function ($server) {
-                    $server->resource('posts', JsonApiController::class);
+                    $server->resource('posts', JsonApiController::class)->relationships(function ($relationships) {
+                        $relationships->hasMany('comments');
+                    });
                     $server->resource('categories', JsonApiController::class);
                     $server->resource('comments', JsonApiController::class);
                 });
