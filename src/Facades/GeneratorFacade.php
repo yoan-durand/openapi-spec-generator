@@ -4,6 +4,10 @@ namespace LaravelJsonApi\OpenApiSpec\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
+/**
+ * Class GeneratorFacade
+ * @method static bool generate(string $serverKey)
+ */
 class GeneratorFacade extends Facade
 {
     /**

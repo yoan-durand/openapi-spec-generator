@@ -3,7 +3,7 @@
 namespace LaravelJsonApi\OpenApiSpec\Commands;
 
 use Illuminate\Console\Command;
-use OpenApiGenerator;
+use LaravelJsonApi\OpenApiSpec\Facades\GeneratorFacade;
 
 class GenerateCommand extends Command
 {
@@ -39,10 +39,10 @@ class GenerateCommand extends Command
     public function handle()
     {
         $serverKey = $this->argument('serverKey');
-        
+
         $this->info('Generating Open API spec...');
 
-        OpenApiGenerator::generate($serverKey);
+        GeneratorFacade::generate($serverKey);
 
         $this->line('Complete! /storage/app/'.$serverKey.'_openapi.yaml');
         $this->newLine();
