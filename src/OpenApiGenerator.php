@@ -28,10 +28,15 @@ use LaravelJsonApi\Eloquent\Fields\Str;
 
 class OpenApiGenerator
 {
-    public function generate($serverKey)
+
+    /**
+     * @throws \cebe\openapi\exceptions\TypeErrorException
+     * @throws \cebe\openapi\exceptions\UnknownPropertyException
+     */
+    public function generate($serverKey): string
     {
         $server = config('jsonapi.servers.' . $serverKey);
-        
+
         // Initial OpenAPI object
         $openapi = new \cebe\openapi\spec\OpenApi([
             'openapi' => '3.0.2',
@@ -47,7 +52,7 @@ class OpenApiGenerator
 
         // Load JSON:API Server
         $jsonapiServer = new $server(app(), $serverKey);
-        
+
         // Add server to OpenAPI spec
         $openapi->__set('servers', [new Server([
             'url' => "{serverURL}",
@@ -59,11 +64,11 @@ class OpenApiGenerator
                 ])
             ]
         ])]);
-        
+
         $allSchemas = [];
         $allRequests = [];
         $allParameters = [];
-        
+
         // Get all Laravel routes associated with this JSON:API Server
         $routes = collect(Route::getRoutes()->getRoutes())
             ->filter(function (\Illuminate\Routing\Route $route) use ($serverKey) {
@@ -75,15 +80,15 @@ class OpenApiGenerator
         foreach ($routes as $route) {
             $uri = $route->uri;
             $routeUri = str_replace($route->getPrefix(), '', $uri);
-            
+
             $requiresPath = \Str::contains($routeUri, '{');
-            
+
             if ($requiresPath) {
                 $schemaName = \Str::between($routeUri, '{', '}');
             } else {
                 $schemaName = str_replace('/', '', $routeUri);
             }
-            
+
             $schemaName = (string)\Str::of($schemaName)->plural()->replace('_', '-');
 
             $sh = $jsonapiServer->schemas()->schemaFor($schemaName);
@@ -176,7 +181,7 @@ class OpenApiGenerator
                         ],
                     ]));
                 }
-                
+
                 $responses->addResponse(401, new Response([
                     'description' => "Unauthorized Action",
                     "content" => [
@@ -189,7 +194,7 @@ class OpenApiGenerator
                         ])
                     ],
                 ]));
-                
+
                 $responses->addResponse(403, new Response([
                     'description' => "Forbidden Action",
                     "content" => [
@@ -202,7 +207,7 @@ class OpenApiGenerator
                         ])
                     ],
                 ]));
-                
+
                 $responses->addResponse(404, new Response([
                     'description' => "Content Not Found",
                     "content" => [
@@ -215,7 +220,7 @@ class OpenApiGenerator
                         ])
                     ],
                 ]));
-                
+
                 if ($requiresPath) {
                     $models = ($schema::model())::all();
                     array_push($parameters, new Parameter([
@@ -297,14 +302,14 @@ class OpenApiGenerator
         foreach ($jsonapiServer->schemas()->types() as $schemaName) {
             $schema = $jsonapiServer->schemas()->schemaFor($schemaName);
             $schemaNamePlural = (string)\Str::of($schemaName)->plural()->replace('_', '-');
-            
+
             $methods = ['GET', 'PATCH', 'POST', 'DELETE'];
-            
+
             foreach ($methods as $method) {
                 $fieldSchemas = [];
                 $includedSchemas = [];
                 $parameters = [];
-                
+
                 if ($method === 'GET') {
                     foreach ($schema->fields() as $field) {
                         if ($field instanceof Relation) {
@@ -321,9 +326,9 @@ class OpenApiGenerator
                             continue;
                         }
                     }
-                    
+
                     $schemaData = $this->getSwaggerSchema($jsonapiServer, $schema, $schemaName, $schemaNamePlural, $method, $allSchemas);
-                    
+
                     $allSchemas = array_merge($allSchemas, [$schemaName => new Schema([
                         'title' => $schemaName,
                         'properties' => [
@@ -351,13 +356,13 @@ class OpenApiGenerator
                             // ])
                         ],
                     ])]);
-                    
+
                     $allSchemas = array_merge($allSchemas, [$schemaName . "_data" => new Schema([
                         'title' => $schemaName . "_data",
                         'properties' => $schemaData->__get('properties'),
                     ])]);
                 }
-                
+
                 if (!empty($schema->fields()) && $method !== 'GET') {
                     $contents = [];
                     foreach ($schema->fields() as $field) {
@@ -398,7 +403,7 @@ class OpenApiGenerator
                 "description" => $schemaName,
             ], $method));
         }
-        
+
         $openapi->components->__set('schemas', array_merge($this->getDefaultSchema(), $allSchemas));
         $openapi->components->__set('requestBodies', $allRequests);
         $openapi->components->__set('parameters', array_merge($openapi->components->parameters, $allParameters));
@@ -416,6 +421,9 @@ class OpenApiGenerator
         return $yaml;
     }
 
+    /**
+     * @throws \cebe\openapi\exceptions\TypeErrorException
+     */
     private function getSwaggerSchema($server, $schema, string $schemaName, string $schemaNamePlural, string $method,
                                       $allSchemas, $forIncludes = false) {
         if (isset($allSchemas[$schemaNamePlural])) return $all_schemas[$schemaNamePlural];
@@ -548,8 +556,11 @@ class OpenApiGenerator
             ]
         ]);
     }
-                                      
-    private function getDefaultSchema()
+
+    /**
+     * @throws \cebe\openapi\exceptions\TypeErrorException
+     */
+    private function getDefaultSchema(): array
     {
         return [
             'unauthorized' => new Schema([
@@ -630,8 +641,11 @@ class OpenApiGenerator
             ]),
         ];
     }
-    
-    protected function getDefaultComponents()
+
+    /**
+     * @throws \cebe\openapi\exceptions\TypeErrorException
+     */
+    protected function getDefaultComponents(): Components
     {
         return new Components([
             'parameters' => [
