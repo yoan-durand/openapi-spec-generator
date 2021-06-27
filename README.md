@@ -8,13 +8,17 @@ Designed to work with [Laravel JSON:API](https://laraveljsonapi.io/)
 
 - [x] Command to generate to storage folder
 - [x] Get basic test suite running with GitHub Actions
-- [x] Add extra operation descriptons via config
+- [x] Add extra operation descriptions via config
 - [x] Add in tags & x-tagGroups (via config)
 - [ ] Consider `->readonly()` etc in routes
 - [ ] Remove links in payload data when saving resources
 - [ ] Fix includes and relations
+  - [ ] Create separate schemas for get/post/patch
+  - [ ] Add relationship routes
+- [ ] Add authentication
+- [ ] Add custom queries/filters
 - [ ] Tidy up the code!!
-- [ ] Add tests
+- [ ] Add tests (Use the dummy by laraveljsonapi to integrate all features)
 
 🙏 Based upon initial prototype by [martianatwork](https://github.com/martianatwork)
 
@@ -22,7 +26,7 @@ Designed to work with [Laravel JSON:API](https://laraveljsonapi.io/)
 
 Install package
 ```
-composer install neondigital/openapi-spec-generator
+composer require neondigital/openapi-spec-generator
 ```
 
 Publish the config file
@@ -35,6 +39,7 @@ Generate the Open API spec
 ```
 php artisan jsonapi:openapi:generate v1
 ```
+Note that a seeded DB is required! The seeded data will be used to generate Samples. 
 
 ## Generating Documentation
 
