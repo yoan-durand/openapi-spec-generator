@@ -1,5 +1,5 @@
 {
-    "name": "neondigital/openapi-spec-generator",
+    "name": "byteit/openapi-spec-generator",
     "description": "Creates Open API spec for a Laravel JSON:API",
     "license": "Apache-2.0",
     "require": {
