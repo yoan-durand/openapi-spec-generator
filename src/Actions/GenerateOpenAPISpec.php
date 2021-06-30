@@ -36,6 +36,7 @@ use Throwable;
 class GenerateOpenAPISpec
 {
     public const MEDIA_TYPE = 'application/vnd.api+json';
+    public const OA_VERSION = '3.0.2';
 
     protected string $serverKey;
     protected OpenApi $openApi;
@@ -45,6 +46,7 @@ class GenerateOpenAPISpec
     protected array $parameters = [];
     protected array $routeMethods = [];
     protected Server $jsonapiServer;
+
     public function __construct(string $serverKey)
     {
         $this->serverKey = $serverKey;
@@ -62,7 +64,7 @@ class GenerateOpenAPISpec
 
         // Initial OpenAPI object
         $openapi = new OpenApi([
-          'openapi' => '3.0.2',
+          'openapi' => self::OA_VERSION,
           'info' => [
             'title' => config("openapi.servers.$serverKey.info.title"),
             'description' => config("openapi.servers.$serverKey.info.description"),
@@ -103,8 +105,6 @@ class GenerateOpenAPISpec
           );
 
         foreach ($this->routes as $route) {
-
-
             foreach ($route->methods() as $method) {
                 $this->generateOperationForMethod(
                   $method,
@@ -251,7 +251,6 @@ class GenerateOpenAPISpec
         $relationSchemas = [];
 
         $modelClass = $schema::model();
-        $models = $modelClass::all();
         $model = $modelClass::first();
 
         foreach ($schema->fields() as $field) {
