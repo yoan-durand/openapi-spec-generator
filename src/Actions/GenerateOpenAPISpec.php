@@ -142,7 +142,7 @@ class GenerateOpenAPISpec
                         }
                     }
 
-                    $schemaData = $this->getOpenApiSchema(
+                    $dataSchema = $this->createOADataSchema(
                       $schema,
                       $schemaName,
                       $schemaNamePlural,
@@ -153,7 +153,7 @@ class GenerateOpenAPISpec
                     $this->schemas[$schemaName] = new OASchema([
                       'title' => ucfirst($schemaName),
                       'properties' => [
-                        "jsonapi" => new OASchema([
+                        'jsonapi' => new OASchema([
                           'title' => 'jsonapi',
                           'properties' => [
                             "version" => new OASchema([
@@ -163,10 +163,10 @@ class GenerateOpenAPISpec
                             ]),
                           ],
                         ]),
-                        "data" => new OASchema([
-                          "oneOf" => [
+                        'data' => new OASchema([
+                          'oneOf' => [
                             new Reference([
-                              '$ref' => "#/components/schemas/".$schemaNamePlural."_data",
+                              '$ref' => '#/components/schemas/'.$schemaNamePlural.'_data',
                             ]),
                           ],
                         ]),
@@ -178,9 +178,9 @@ class GenerateOpenAPISpec
                       ],
                     ]);
 
-                    $this->schemas[$schemaName."_data"] = new OASchema([
-                      'title' => ucfirst($schemaName)." Data",
-                      'properties' => $schemaData->__get('properties'),
+                    $this->schemas[$schemaName.'_data'] = new OASchema([
+                      'title' => ucfirst($schemaName).' Data',
+                      'properties' => $dataSchema->__get('properties'),
                     ]);
                 }
 
@@ -237,7 +237,7 @@ class GenerateOpenAPISpec
     /**
      * @throws \cebe\openapi\exceptions\TypeErrorException
      */
-    private function getOpenApiSchema(
+    private function createOADataSchema(
       Schema $schema,
       string $schemaName,
       string $schemaNamePlural,
