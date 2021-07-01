@@ -22,11 +22,15 @@ use cebe\openapi\spec\Type;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str as StrStr;
+use LaravelJsonApi\Contracts\Schema\Attribute;
 use LaravelJsonApi\Contracts\Schema\Schema;
 use LaravelJsonApi\Contracts\Server\Server;
+use LaravelJsonApi\Eloquent\Fields\ArrayHash;
+use LaravelJsonApi\Eloquent\Fields\ArrayList;
 use LaravelJsonApi\Eloquent\Fields\Boolean;
 use LaravelJsonApi\Eloquent\Fields\DateTime;
 use LaravelJsonApi\Eloquent\Fields\ID;
+use LaravelJsonApi\Eloquent\Fields\Map;
 use LaravelJsonApi\Eloquent\Fields\Number;
 use LaravelJsonApi\Eloquent\Fields\Relations\Relation;
 use LaravelJsonApi\Eloquent\Fields\Relations\ToOne;
@@ -35,16 +39,25 @@ use Throwable;
 
 class GenerateOpenAPISpec
 {
+
     public const MEDIA_TYPE = 'application/vnd.api+json';
+
     public const OA_VERSION = '3.0.2';
 
     protected string $serverKey;
+
     protected OpenApi $openApi;
+
     protected Collection $routes;
+
     protected array $schemas = [];
+
     protected array $requests = [];
+
     protected array $parameters = [];
+
     protected array $routeMethods = [];
+
     protected Server $jsonapiServer;
 
     public function __construct(string $serverKey)
@@ -218,9 +231,7 @@ class GenerateOpenAPISpec
 
         // Add paths to OpenApi spec
         foreach ($this->routeMethods as $key => $method) {
-            $openapi->paths[$key] = new PathItem(array_merge([
-              "description" => $schemaName,
-            ], $method));
+            $openapi->paths[$key] = new PathItem($method);
         }
 
         $openapi->components->__set('schemas',
@@ -228,7 +239,6 @@ class GenerateOpenAPISpec
         $openapi->components->__set('requestBodies', $this->requests);
         $openapi->components->__set('parameters',
           array_merge($openapi->components->parameters, $this->parameters));
-
 
 
         return $openapi;
@@ -243,10 +253,27 @@ class GenerateOpenAPISpec
       string $schemaNamePlural,
       string $method,
       $forIncludes = false
-    ) {
-        if (isset($this->schemas[$schemaNamePlural])) {
-            return $this->schemas[$schemaNamePlural];
-        }
+    ): ?OASchema {
+        // Return the schema if it already exists
+        return $this->schemas[$schemaNamePlural] ?? match ($method) {
+              'GET' => $this->createOAGetDataSchema($schema, $schemaName,
+                $schemaNamePlural),
+              'POST' => $this->createOAPostDataSchema($schema, $schemaName,
+                $schemaNamePlural),
+              'PATCH' => $this->createOAPatchDataSchema($schema, $schemaName,
+                $schemaNamePlural),
+              default => null,
+          };
+    }
+
+    /**
+     * @throws \cebe\openapi\exceptions\TypeErrorException
+     */
+    private function createOAGetDataSchema(
+      Schema $schema,
+      string $schemaName,
+      string $schemaNamePlural,
+    ): OASchema {
         $fieldSchemas = [];
         $relationSchemas = [];
 
@@ -254,38 +281,32 @@ class GenerateOpenAPISpec
         $model = $modelClass::first();
 
         foreach ($schema->fields() as $field) {
-            if ($method === 'DELETE') {
-                continue;
-            }
+
             $fieldSchema = new OASchema([
               'title' => $field->name(),
               "type" => Type::OBJECT,
             ]);
+
             if ($field instanceof ID) {
                 continue;
             }
-            if (
-              $field instanceof Str ||
-              $field instanceof ID ||
-              $field instanceof DateTime
-            ) {
-                $fieldSchema->__set('type', Type::STRING);
-            }
-            if ($field instanceof Boolean) {
-                $fieldSchema->__set('type', Type::BOOLEAN);
-            }
-            if ($field instanceof Number) {
-                $fieldSchema->__set('type', Type::NUMBER);
-            }
-            if ( ! ($field instanceof Relation)) {
+
+            if ($field instanceof Attribute) {
+                $fieldSchema->type = match (true) {
+                    $field instanceof Boolean => Type::BOOLEAN,
+                    $field instanceof Number => Type::NUMBER,
+                    $field instanceof ArrayList => Type::ARRAY,
+                    $field instanceof ArrayHash,
+                      $field instanceof Map => Type::OBJECT,
+                    default => Type::STRING
+                };
+
+                // Try to get example data
                 try {
-                    $fieldSchema->__set("example",
-                      optional($model)->{$field->column()});
-                } catch (Throwable $exception) {
-                    // TODO: Figure out if the field is readonly
-                }
-            }
-            if ($field instanceof Relation) {
+                    $fieldSchema->example = $model?->{$field->column()};
+                } catch (Throwable) {}
+
+            } elseif ($field instanceof Relation) {
                 $relationSchema = new OASchema([
                   'title' => $field->name(),
                 ]);
@@ -298,7 +319,8 @@ class GenerateOpenAPISpec
                 $fieldName = \LaravelJsonApi\Core\Support\Str::dasherize(
                   \LaravelJsonApi\Core\Support\Str::plural($field->relationName())
                 );
-                $relationLinkSchema->__set('properties', [
+
+                $relationLinkSchema->properties = [
                   'related' => new OASchema([
                     'title' => 'related',
                     "type" => Type::STRING,
@@ -307,8 +329,8 @@ class GenerateOpenAPISpec
                     'title' => 'self',
                     "type" => Type::STRING,
                   ]),
-                ]);
-                $relationDataSchema->__set('properties', [
+                ];
+                $relationDataSchema->properties = [
                   'type' => new OASchema([
                     'title' => 'type',
                     "type" => Type::STRING,
@@ -320,8 +342,8 @@ class GenerateOpenAPISpec
                     "example" => (string) optional($model)->{$schema->id()
                       ->column() ?? optional($model)->getRouteKeyName()},
                   ]),
-                ]);
-                $relationSchema->__set('properties', [
+                ];
+                $relationSchema->properties = [
                   'links' => new OASchema([
                     'title' => 'links',
                     'type' => Type::OBJECT,
@@ -336,10 +358,12 @@ class GenerateOpenAPISpec
                     'title' => 'data',
                     "allOf" => [$relationDataSchema],
                   ]),
-                ]);
+                ];
+
                 if (
                   $field instanceof ToOne
-                  && in_array($fieldName, $this->jsonapiServer->schemas()->types(), true)
+                  && in_array($fieldName,
+                    $this->jsonapiServer->schemas()->types(), true)
                 ) {
                     $fieldSchema->__set('oneOf', [
                       $relationSchema,
@@ -348,9 +372,11 @@ class GenerateOpenAPISpec
                 $relationSchemas[$field->name()] = $relationSchema;
                 continue;
             }
+
             $fieldSchemas[$field->name()] = $fieldSchema;
             unset($fieldSchema);
         }
+
 
         return new OASchema([
           "type" => Type::OBJECT,
@@ -381,7 +407,316 @@ class GenerateOpenAPISpec
                 "self" => new OASchema([
                   "title" => "self",
                   'type' => Type::STRING,
-                  "example" => $this->jsonapiServer->url([$schemaNamePlural,(string) optional($model)->{$schema->id()->column() ?? optional($model)->getRouteKeyName()}]),
+                  "example" => $this->jsonapiServer->url([$schemaNamePlural,
+                    (string) optional($model)->{$schema->id()
+                      ->column() ?? optional($model)->getRouteKeyName()},
+                  ]),
+                ]),
+              ],
+            ]),
+          ],
+        ]);
+    }
+
+    /**
+     * @throws \cebe\openapi\exceptions\TypeErrorException
+     */
+    private function createOAPostDataSchema(
+      Schema $schema,
+      string $schemaName,
+      string $schemaNamePlural,
+    ): OASchema {
+        $fieldSchemas = [];
+        $relationSchemas = [];
+
+        $modelClass = $schema::model();
+        $model = $modelClass::first();
+
+        foreach ($schema->fields() as $field) {
+
+            $fieldSchema = new OASchema([
+              'title' => $field->name(),
+              "type" => Type::OBJECT,
+            ]);
+
+            if ($field instanceof ID) {
+                continue;
+            }
+
+            if ($field instanceof Attribute) {
+                $fieldSchema->type = match (true) {
+                    $field instanceof Boolean => Type::BOOLEAN,
+                    $field instanceof Number => Type::NUMBER,
+                    $field instanceof ArrayList => Type::ARRAY,
+                    $field instanceof ArrayHash,
+                      $field instanceof Map => Type::OBJECT,
+                    default => Type::STRING
+                };
+
+                // Try to get example data
+                try {
+                    $fieldSchema->example = $model?->{$field->column()};
+                } catch (Throwable $exception) {
+                }
+
+            } elseif ($field instanceof Relation) {
+                $relationSchema = new OASchema([
+                  'title' => $field->name(),
+                ]);
+                $relationLinkSchema = new OASchema([
+                  'title' => $field->name(),
+                ]);
+                $relationDataSchema = new OASchema([
+                  'title' => $field->name(),
+                ]);
+                $fieldName = \LaravelJsonApi\Core\Support\Str::dasherize(
+                  \LaravelJsonApi\Core\Support\Str::plural($field->relationName())
+                );
+
+                $relationLinkSchema->properties = [
+                  'related' => new OASchema([
+                    'title' => 'related',
+                    "type" => Type::STRING,
+                  ]),
+                  'self' => new OASchema([
+                    'title' => 'self',
+                    "type" => Type::STRING,
+                  ]),
+                ];
+                $relationDataSchema->properties = [
+                  'type' => new OASchema([
+                    'title' => 'type',
+                    "type" => Type::STRING,
+                    "example" => $fieldName,
+                  ]),
+                  'id' => new OASchema([
+                    'title' => 'id',
+                    "type" => Type::STRING,
+                    "example" => (string) optional($model)->{$schema->id()
+                      ->column() ?? optional($model)->getRouteKeyName()},
+                  ]),
+                ];
+                $relationSchema->properties = [
+                  'links' => new OASchema([
+                    'title' => 'links',
+                    'type' => Type::OBJECT,
+                    "allOf" => [$relationLinkSchema],
+                    "example" => $this->jsonapiServer->url([
+                      $fieldName,
+                      (string) optional($model)->{$schema->id()
+                        ->column() ?? optional($model)->getRouteKeyName()},
+                    ]),
+                  ]),
+                  'data' => new OASchema([
+                    'title' => 'data',
+                    "allOf" => [$relationDataSchema],
+                  ]),
+                ];
+
+                if (
+                  $field instanceof ToOne
+                  && in_array($fieldName,
+                    $this->jsonapiServer->schemas()->types(), true)
+                ) {
+                    $fieldSchema->__set('oneOf', [
+                      $relationSchema,
+                    ]);
+                }
+                $relationSchemas[$field->name()] = $relationSchema;
+                continue;
+            }
+
+            $fieldSchemas[$field->name()] = $fieldSchema;
+            unset($fieldSchema);
+        }
+
+
+        return new OASchema([
+          "type" => Type::OBJECT,
+          "title" => "data",
+          "properties" => [
+            "type" => new OASchema([
+              'title' => $schemaName,
+              'type' => Type::STRING,
+              'example' => $schemaNamePlural,
+            ]),
+            "id" => new OASchema([
+              'title' => 'id',
+              'type' => Type::STRING,
+              "example" => optional($model)->id,
+            ]),
+            "attributes" => new OASchema([
+              'title' => 'attributes',
+              'properties' => $fieldSchemas,
+            ]),
+            "relationships" => new OASchema([
+              'title' => 'relationships',
+              'properties' => ! empty($relationSchemas) ? $relationSchemas : [],
+            ]),
+            "links" => new OASchema([
+              'title' => 'links',
+              "nullable" => true,
+              'properties' => [
+                "self" => new OASchema([
+                  "title" => "self",
+                  'type' => Type::STRING,
+                  "example" => $this->jsonapiServer->url([$schemaNamePlural,
+                    (string) optional($model)->{$schema->id()
+                      ->column() ?? optional($model)->getRouteKeyName()},
+                  ]),
+                ]),
+              ],
+            ]),
+          ],
+        ]);
+    }
+
+    /**
+     * @throws \cebe\openapi\exceptions\TypeErrorException
+     */
+    private function createOAPatchDataSchema(
+      Schema $schema,
+      string $schemaName,
+      string $schemaNamePlural,
+    ): OASchema {
+        $fieldSchemas = [];
+        $relationSchemas = [];
+
+        $modelClass = $schema::model();
+        $model = $modelClass::first();
+
+        foreach ($schema->fields() as $field) {
+
+            $fieldSchema = new OASchema([
+              'title' => $field->name(),
+              "type" => Type::OBJECT,
+            ]);
+
+            if ($field instanceof ID) {
+                continue;
+            }
+
+            if ($field instanceof Attribute) {
+                $fieldSchema->type = match (true) {
+                    $field instanceof Boolean => Type::BOOLEAN,
+                    $field instanceof Number => Type::NUMBER,
+                    $field instanceof ArrayList => Type::ARRAY,
+                    $field instanceof ArrayHash,
+                      $field instanceof Map => Type::OBJECT,
+                    default => Type::STRING
+                };
+
+                // Try to get example data
+                try {
+                    $fieldSchema->example = $model?->{$field->column()};
+                } catch (Throwable $exception) {
+                }
+
+            } elseif ($field instanceof Relation) {
+                $relationSchema = new OASchema([
+                  'title' => $field->name(),
+                ]);
+                $relationLinkSchema = new OASchema([
+                  'title' => $field->name(),
+                ]);
+                $relationDataSchema = new OASchema([
+                  'title' => $field->name(),
+                ]);
+                $fieldName = \LaravelJsonApi\Core\Support\Str::dasherize(
+                  \LaravelJsonApi\Core\Support\Str::plural($field->relationName())
+                );
+
+                $relationLinkSchema->properties = [
+                  'related' => new OASchema([
+                    'title' => 'related',
+                    "type" => Type::STRING,
+                  ]),
+                  'self' => new OASchema([
+                    'title' => 'self',
+                    "type" => Type::STRING,
+                  ]),
+                ];
+                $relationDataSchema->properties = [
+                  'type' => new OASchema([
+                    'title' => 'type',
+                    "type" => Type::STRING,
+                    "example" => $fieldName,
+                  ]),
+                  'id' => new OASchema([
+                    'title' => 'id',
+                    "type" => Type::STRING,
+                    "example" => (string) optional($model)->{$schema->id()
+                      ->column() ?? optional($model)->getRouteKeyName()},
+                  ]),
+                ];
+                $relationSchema->properties = [
+                  'links' => new OASchema([
+                    'title' => 'links',
+                    'type' => Type::OBJECT,
+                    "allOf" => [$relationLinkSchema],
+                    "example" => $this->jsonapiServer->url([
+                      $fieldName,
+                      (string) optional($model)->{$schema->id()
+                        ->column() ?? optional($model)->getRouteKeyName()},
+                    ]),
+                  ]),
+                  'data' => new OASchema([
+                    'title' => 'data',
+                    "allOf" => [$relationDataSchema],
+                  ]),
+                ];
+
+                if (
+                  $field instanceof ToOne
+                  && in_array($fieldName,
+                    $this->jsonapiServer->schemas()->types(), true)
+                ) {
+                    $fieldSchema->__set('oneOf', [
+                      $relationSchema,
+                    ]);
+                }
+                $relationSchemas[$field->name()] = $relationSchema;
+                continue;
+            }
+
+            $fieldSchemas[$field->name()] = $fieldSchema;
+            unset($fieldSchema);
+        }
+
+
+        return new OASchema([
+          "type" => Type::OBJECT,
+          "title" => "data",
+          "properties" => [
+            "type" => new OASchema([
+              'title' => $schemaName,
+              'type' => Type::STRING,
+              'example' => $schemaNamePlural,
+            ]),
+            "id" => new OASchema([
+              'title' => 'id',
+              'type' => Type::STRING,
+              "example" => optional($model)->id,
+            ]),
+            "attributes" => new OASchema([
+              'title' => 'attributes',
+              'properties' => $fieldSchemas,
+            ]),
+            "relationships" => new OASchema([
+              'title' => 'relationships',
+              'properties' => ! empty($relationSchemas) ? $relationSchemas : [],
+            ]),
+            "links" => new OASchema([
+              'title' => 'links',
+              "nullable" => true,
+              'properties' => [
+                "self" => new OASchema([
+                  "title" => "self",
+                  'type' => Type::STRING,
+                  "example" => $this->jsonapiServer->url([$schemaNamePlural,
+                    (string) optional($model)->{$schema->id()
+                      ->column() ?? optional($model)->getRouteKeyName()},
+                  ]),
                 ]),
               ],
             ]),
@@ -584,7 +919,7 @@ class GenerateOpenAPISpec
 
         $schema = $this->jsonapiServer->schemas()->schemaFor($schemaName);
 
-        if($schema->isRelationship($action)){
+        if ($schema->isRelationship($action)) {
             // Drop out, dont know yet what todo
 
             return;
@@ -815,4 +1150,5 @@ class GenerateOpenAPISpec
         }
         $this->routeMethods[$routeUri][strtolower($method)] = $operation;
     }
+
 }

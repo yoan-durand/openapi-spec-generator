@@ -11,14 +11,19 @@ Designed to work with [Laravel JSON:API](https://laraveljsonapi.io/)
 - [x] Add extra operation descriptions via config
 - [x] Add in tags & x-tagGroups (via config)
 - [ ] Consider `->readonly()` etc in routes
-- [ ] Remove links in payload data when saving resources
+- [ ] Organize OASchema creation by Api Schemas + Actions and match later to routes
+  - [ ] Fields for GET
+  - [ ] Fields for POST (map with required/readonly fields) + Relations (resource creation + mapping with existing)(use post schema of resource)
+  - [ ] Fields for PATCH (map with required/readonly fields) + Relations (Update/mapping)
+- [ ] 
 - [ ] Fix includes and relations
-  - [ ] Create separate schemas for get/post/patch
   - [ ] Add relationship routes
 - [ ] Add authentication
 - [ ] Add custom queries/filters
+- [ ] Add custom actions
 - [ ] Tidy up the code!!
 - [ ] Add tests (Use the dummy by laraveljsonapi to integrate all features)
+- [ ] Use interface + traits on Server/Schema to provide description etc
 
 🙏 Based upon initial prototype by [martianatwork](https://github.com/martianatwork)
 
