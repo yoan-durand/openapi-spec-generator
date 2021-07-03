@@ -15,10 +15,12 @@ Designed to work with [Laravel JSON:API](https://laraveljsonapi.io/)
   - [ ] hidden
 - [x] Split schemas/requests/responses by action
 - [ ] Fix includes and relations
-  - [ ] Add relationship routes
+  - [x] Add relationship routes
+  - [ ] Add includes 
 - [ ] Add authentication
 - [ ] Add custom queries/filters
-- [ ] Add custom actions
+- [x] Add custom actions
+- [ ] Add a way to document custom actions
 - [ ] Tidy up the code!!
 - [x] Add tests (Use the dummy by laraveljsonapi to integrate all features)
 - [ ] Use interface + traits on Server/Schema to provide description etc

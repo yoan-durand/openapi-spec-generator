@@ -26,6 +26,7 @@ use LaravelJsonApi\OpenApiSpec\Tests\Support\Models\Video;
 use Illuminate\Support\Facades\Auth;
 use LaravelJsonApi\Core\Server\Server as BaseServer;
 use LaravelJsonApi\Laravel\LaravelJsonApi;
+use LogicException;
 
 class Server extends BaseServer
 {
@@ -71,5 +72,19 @@ class Server extends BaseServer
             Users\UserSchema::class,
             Videos\VideoSchema::class,
         ];
+    }
+
+    /**
+     * The base URI namespace for this server.
+     *
+     * @return string
+     */
+    public function baseUri(): string
+    {
+        if (!empty($this->baseUri)) {
+            return $this->baseUri;
+        }
+
+        throw new LogicException('No base URI set on server.');
     }
 }

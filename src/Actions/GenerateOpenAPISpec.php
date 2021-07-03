@@ -25,6 +25,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str as StrStr;
 use LaravelJsonApi\Contracts\Schema\Attribute;
+use LaravelJsonApi\Contracts\Schema\PolymorphicRelation;
 use LaravelJsonApi\Contracts\Schema\Schema;
 use LaravelJsonApi\Contracts\Server\Server;
 use LaravelJsonApi\Core\Support\Str;
@@ -34,7 +35,10 @@ use LaravelJsonApi\Eloquent\Fields\Boolean;
 use LaravelJsonApi\Eloquent\Fields\ID;
 use LaravelJsonApi\Eloquent\Fields\Map;
 use LaravelJsonApi\Eloquent\Fields\Number;
+use LaravelJsonApi\Eloquent\Fields\Relations\MorphTo;
+use LaravelJsonApi\Eloquent\Fields\Relations\MorphToMany;
 use LaravelJsonApi\Eloquent\Fields\Relations\Relation;
+use LaravelJsonApi\Eloquent\Fields\Relations\ToMany;
 use LaravelJsonApi\Eloquent\Fields\Relations\ToOne;
 use Throwable;
 
@@ -148,17 +152,12 @@ class GenerateOpenAPISpec
 
 
         $schema = $this->jsonapiServer->schemas()->schemaFor($resourceType);
-        if ($schema->isRelationship($action)) {
-            // Drop out, dont know yet what todo
-
-            return;
-        }
 
         $operationId = collect($routeNameSegments)->join('_');
 
         $uri = $route->uri();
 
-        $routeUri = str_replace($route->getPrefix(), '', $uri);
+        $routeUri = '/'.str_replace($this->jsonapiServer->baseUri(), '', $uri);
 
         // @todo extract parameters by regex
         $hasPathParameter = \Str::contains($routeUri, '{');
@@ -233,9 +232,7 @@ class GenerateOpenAPISpec
                 ]),
               ],
             ]));
-        }
-
-        if ($action === 'show') {
+        } elseif ($action === 'show') {
             $ref = $this->generateOAGetResponseSchema($schema,
               StrStr::singular($resourceType),
               $resourceType);
@@ -252,9 +249,7 @@ class GenerateOpenAPISpec
                 ]),
               ],
             ]));
-        }
-
-        if ($action === 'store') {
+        } elseif ($action === 'store') {
 
             $requestBody = $this->generateOAStoreRequestBody($schema,
               StrStr::singular($resourceType),
@@ -276,9 +271,7 @@ class GenerateOpenAPISpec
                 ]),
               ],
             ]));
-        }
-
-        if ($action === 'update') {
+        } elseif ($action === 'update') {
 
 
             $requestBody = $this->generateOAUpdateRequestBody($schema,
@@ -301,12 +294,108 @@ class GenerateOpenAPISpec
                 ]),
               ],
             ]));
-        }
-
-        if ($action === 'delete') {
+        } elseif ($action === 'delete') {
             $responses->addResponse(204, new Response([
               'description' => ucfirst($action)." $resourceType",
             ]));
+        } elseif ($schema->isRelationship($action)) {
+            // Drop out, dont know yet what todo
+
+            $relation = $schema->relationship($action);
+
+            $singular = $relation->toOne();
+
+            $targetSchemaName = $relation->inverse();
+
+
+            if ($relation instanceof PolymorphicRelation) {
+                $targetSchemaNames = $relation->inverseTypes();
+
+                $targetOADataSchemas = collect($targetSchemaNames)
+                  ->combine(
+                    collect($targetSchemaNames)
+                      ->map(
+                        function ($targetSchemaName) {
+                            return $this->jsonapiServer->schemas()
+                              ->schemaFor($targetSchemaName);
+                        })
+                  )
+                  ->map(function ($schema, $name) {
+                      return $this->generateOAGetDataSchema(
+                        $schema,
+                        StrStr::singular($name),
+                        $name
+                      );
+                  });
+
+                $singular = ! ($relation instanceof ToMany);
+
+                if ($singular) {
+                    $responses->addResponse(200, new Response([
+                      'description' => ucfirst($action)." $resourceType",
+                      "content" => [
+                        self::MEDIA_TYPE => new MediaType([
+                          "schema" => new OASchema([
+                            'properties' => [
+                              'jsonapi' => $this->getDefaultJsonApiSchema(),
+                              'data' => new OASchema([
+                                'oneOf' => $targetOADataSchemas->toArray(),
+                              ]),
+                            ],
+                          ]),
+                        ]),
+                      ],
+                    ]));
+                } else {
+                    $responses->addResponse(200, new Response([
+                      'description' => ucfirst($action)." $resourceType",
+                      "content" => [
+                        self::MEDIA_TYPE => new MediaType([
+                          "schema" => new OASchema([
+                            'properties' => [
+                              'jsonapi' => $this->getDefaultJsonApiSchema(),
+                              'data' => new OASchema([
+                                'type' => Type::ARRAY,
+                                'items' => new OASchema([
+                                  'oneOf' => $targetOADataSchemas->toArray(),
+                                ]),
+                              ]),
+                            ],
+                          ]),
+                        ]),
+                      ],
+                    ]));
+                }
+            } else {
+                $targetSchema = $this->jsonapiServer->schemas()
+                  ->schemaFor($targetSchemaName);
+                if ($singular) {
+                    $ref = $this->generateOAGetResponseSchema(
+                      $targetSchema,
+                      StrStr::singular($targetSchemaName),
+                      $targetSchemaName
+                    );
+                } else {
+                    $ref = $this->generateOAGetMultipleResponseSchema(
+                      $targetSchema,
+                      StrStr::singular($targetSchemaName),
+                      $targetSchemaName
+                    );
+                }
+
+                $responses->addResponse(200, new Response([
+                  'description' => ucfirst($action)." $resourceType",
+                  "content" => [
+                    self::MEDIA_TYPE => new MediaType([
+                      "schema" => new OASchema([
+                        'oneOf' => [
+                          $ref,
+                        ],
+                      ]),
+                    ]),
+                  ],
+                ]));
+            }
         }
 
 
