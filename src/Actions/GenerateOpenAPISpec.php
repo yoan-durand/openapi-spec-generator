@@ -128,7 +128,6 @@ class GenerateOpenAPISpec
         return $this->openApi;
     }
 
-
     /**
      * @param  mixed  $method
      * @param  mixed  $route
@@ -181,16 +180,23 @@ class GenerateOpenAPISpec
 
         if ($action === 'index') {
             foreach ($schema->filters() as $filter) {
-                $examples = $schema::model()::all()
-                  ->pluck($filter->key())
-                  ->mapWithKeys(function ($f) {
-                      return [
-                        $f => new Example([
-                          'value' => $f,
-                        ]),
-                      ];
-                  })
-                  ->toArray();
+                $key = $filter->key();
+
+                try {
+                    $examples = $schema::model()::all()
+                      ->pluck($key)
+                      ->mapWithKeys(function ($f) {
+                          return [
+                            $f => new Example([
+                              'value' => $f,
+                            ]),
+                          ];
+                      })
+                      ->toArray();
+                } catch (\Exception) {
+                    $examples = [];
+                }
+
 
                 $parameters[] = new Parameter([
                   'name' => "filter[{$filter->key()}]",
@@ -376,10 +382,10 @@ class GenerateOpenAPISpec
 
         $summary = match ($action) {
             "index" => "Get all $resourceType",
-            "show" => "Get a " . StrStr::singular($resourceType),
-            "store" => "Store a new " . StrStr::singular($resourceType),
-            "update" => "Update the " . StrStr::singular($resourceType),
-            "delete" => "Delete the " . StrStr::singular($resourceType),
+            "show" => "Get a ".StrStr::singular($resourceType),
+            "store" => "Store a new ".StrStr::singular($resourceType),
+            "update" => "Update the ".StrStr::singular($resourceType),
+            "delete" => "Delete the ".StrStr::singular($resourceType),
             default => ucfirst($action),
         };
 
@@ -408,7 +414,6 @@ class GenerateOpenAPISpec
         }
         $this->paths[$routeUri][strtolower($method)] = $operation;
     }
-
 
     /**
      * @throws \cebe\openapi\exceptions\TypeErrorException
@@ -527,7 +532,7 @@ class GenerateOpenAPISpec
 
             $oaSchema = new OASchema([
               "type" => Type::OBJECT,
-              "title" => ucfirst($schemaName) . " data",
+              "title" => ucfirst($schemaName)." data",
               "properties" => [
                 "type" => new OASchema([
                   'title' => $schemaName,
@@ -588,7 +593,7 @@ class GenerateOpenAPISpec
             $ref = $this->addSchema(
               $oaSchemaName,
               new OASchema([
-                'title' => ucfirst($schemaName) . " response",
+                'title' => ucfirst($schemaName)." response",
                 'properties' => [
                   'jsonapi' => $this->getDefaultJsonApiSchema(),
                   'data' => new OASchema([
@@ -618,7 +623,7 @@ class GenerateOpenAPISpec
             $ref = $this->addSchema(
               $oaSchemaName,
               new OASchema([
-                'title' => ucfirst($schemaNamePlural) . " response",
+                'title' => ucfirst($schemaNamePlural)." response",
                 'properties' => [
                   'jsonapi' => $this->getDefaultJsonApiSchema(),
                   'data' => new OASchema([
@@ -727,7 +732,7 @@ class GenerateOpenAPISpec
 
             $oaSchema = new OASchema([
               "type" => Type::OBJECT,
-              "title" => ucfirst($schemaName) . " store data",
+              "title" => ucfirst($schemaName)." store data",
               "properties" => [
                 "type" => new OASchema([
                   'title' => $schemaName,
@@ -749,7 +754,7 @@ class GenerateOpenAPISpec
 
 
             $this->addRequestBody($requestName, new RequestBody([
-                'description' => ucfirst($schemaName) . " store",
+                'description' => ucfirst($schemaName)." store",
                 'content' => [
                   'application/vnd.api+json' => new MediaType([
                     "schema" => new OASchema([
@@ -868,7 +873,7 @@ class GenerateOpenAPISpec
 
             $oaSchema = new OASchema([
               "type" => Type::OBJECT,
-              "title" => ucfirst($schemaName) . " update data",
+              "title" => ucfirst($schemaName)." update data",
               "properties" => [
                 "type" => new OASchema([
                   'title' => $schemaName,
@@ -1084,8 +1089,6 @@ class GenerateOpenAPISpec
         return config("openapi.servers.$serverKey.operations.$operationId.extra_tags",
           []);
     }
-
-
 
     /**
      * @throws \cebe\openapi\exceptions\TypeErrorException

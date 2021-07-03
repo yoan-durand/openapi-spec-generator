@@ -15,40 +15,53 @@
  * limitations under the License.
  */
 
-declare(strict_types=1);
-
 namespace LaravelJsonApi\OpenApiSpec\Tests\Support\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use LaravelJsonApi\OpenApiSpec\Tests\Support\Database\Factories\CommentFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use LaravelJsonApi\OpenApiSpec\Tests\Support\Database\Factories\UserFactory;
 
-class Comment extends Model
+class User extends Authenticatable
 {
 
     use HasFactory;
+    use Notifiable;
     use Concerns\HashRouteKey;
 
     /**
-     * @var string[]
+     * The attributes that are mass assignable.
+     *
+     * @var array
      */
-    protected $fillable = ['content'];
+    protected $fillable = [
+        'name', 'email', 'password',
+    ];
 
     /**
-     * @return BelongsTo
+     * The attributes that should be hidden for arrays.
+     *
+     * @var array
      */
-    public function post(): BelongsTo
-    {
-        return $this->belongsTo(Post::class);
-    }
+    protected $hidden = [
+        'password', 'remember_token',
+    ];
 
     /**
-     * @return BelongsTo
+     * The attributes that should be cast to native types.
+     *
+     * @var array
      */
-    public function user(): BelongsTo
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+    ];
+
+    /**
+     * @return bool
+     */
+    public function isAdmin(): bool
     {
-        return $this->belongsTo(User::class);
+        return 'support@example.com' === $this->email;
     }
 
     /**
@@ -58,6 +71,6 @@ class Comment extends Model
      */
     protected static function newFactory()
     {
-        return new CommentFactory();
+        return new UserFactory();
     }
 }

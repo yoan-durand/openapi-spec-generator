@@ -22,33 +22,61 @@ namespace LaravelJsonApi\OpenApiSpec\Tests\Support\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use LaravelJsonApi\OpenApiSpec\Tests\Support\Database\Factories\CommentFactory;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Support\Str;
+use LaravelJsonApi\OpenApiSpec\Tests\Support\Database\Factories\VideoFactory;
 
-class Comment extends Model
+class Video extends Model
 {
 
     use HasFactory;
-    use Concerns\HashRouteKey;
+
+    /**
+     * @var bool
+     */
+    public $incrementing = false;
+
+    /**
+     * @var string
+     */
+    protected $primaryKey = 'uuid';
+
+    /**
+     * @var string
+     */
+    protected $keyType = 'string';
 
     /**
      * @var string[]
      */
-    protected $fillable = ['content'];
+    protected $fillable = ['title', 'url'];
 
     /**
-     * @return BelongsTo
+     * @inheritDoc
      */
-    public function post(): BelongsTo
+    protected static function booting()
     {
-        return $this->belongsTo(Post::class);
+        parent::booting();
+
+        self::creating(static function (self $model) {
+            $model->{$model->getKeyName()} = $model->{$model->getKeyName()} ?? Str::uuid()->toString();
+        });
     }
 
     /**
      * @return BelongsTo
      */
-    public function user(): BelongsTo
+    public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return MorphToMany
+     */
+    public function tags(): MorphToMany
+    {
+        return $this->morphToMany(Tag::class, 'taggable');
     }
 
     /**
@@ -58,6 +86,6 @@ class Comment extends Model
      */
     protected static function newFactory()
     {
-        return new CommentFactory();
+        return new VideoFactory();
     }
 }

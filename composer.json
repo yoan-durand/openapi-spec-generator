@@ -16,7 +16,8 @@
     "license": "Apache-2.0",
     "require": {
         "php": "^8.0",
-        "cebe/php-openapi": "^1.5"
+        "cebe/php-openapi": "^1.5",
+        "laravel-json-api/hashids": "^1.0@beta"
     },
     "require-dev": {
         "laravel-json-api/laravel": "^1.0",

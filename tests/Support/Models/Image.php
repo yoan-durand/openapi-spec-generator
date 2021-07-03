@@ -21,34 +21,44 @@ namespace LaravelJsonApi\OpenApiSpec\Tests\Support\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use LaravelJsonApi\OpenApiSpec\Tests\Support\Database\Factories\CommentFactory;
+use Illuminate\Support\Str;
+use LaravelJsonApi\OpenApiSpec\Tests\Support\Database\Factories\ImageFactory;
 
-class Comment extends Model
+class Image extends Model
 {
 
     use HasFactory;
-    use Concerns\HashRouteKey;
+
+    /**
+     * @var bool
+     */
+    public $incrementing = false;
+
+    /**
+     * @var string
+     */
+    protected $primaryKey = 'uuid';
+
+    /**
+     * @var string
+     */
+    protected $keyType = 'string';
 
     /**
      * @var string[]
      */
-    protected $fillable = ['content'];
+    protected $fillable = ['url'];
 
     /**
-     * @return BelongsTo
+     * @inheritDoc
      */
-    public function post(): BelongsTo
+    protected static function booting()
     {
-        return $this->belongsTo(Post::class);
-    }
+        parent::booting();
 
-    /**
-     * @return BelongsTo
-     */
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
+        self::creating(static function (self $model) {
+            $model->{$model->getKeyName()} = $model->{$model->getKeyName()} ?? Str::uuid()->toString();
+        });
     }
 
     /**
@@ -58,6 +68,6 @@ class Comment extends Model
      */
     protected static function newFactory()
     {
-        return new CommentFactory();
+        return new ImageFactory();
     }
 }

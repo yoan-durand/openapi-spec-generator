@@ -4,7 +4,7 @@ namespace LaravelJsonApi\OpenApiSpec\Tests;
 
 use LaravelJsonApi\Laravel\Http\Controllers\JsonApiController;
 use LaravelJsonApi\OpenApiSpec\OpenApiServiceProvider;
-use LaravelJsonApi\OpenApiSpec\Tests\Support\JsonApi\Server;
+use LaravelJsonApi\OpenApiSpec\Tests\Support\JsonApi\V1\Server;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\App;
 
@@ -15,6 +15,16 @@ abstract class TestCase extends BaseTestCase
         $app['config']->set('jsonapi.servers', [
             'v1' => Server::class,
         ]);
+
+        $app['config']->set('hashids', [
+          'default' => 'main',
+          'connections' => [
+            'main' => [
+              'salt' => 'Z3wxm8m6fxPMRtjX',
+              'length' => 10,
+            ],
+          ],
+        ]);
     }
 
     protected function defineRoutes($router)
@@ -23,14 +33,25 @@ abstract class TestCase extends BaseTestCase
             $jsonApiRoute = App::make(\LaravelJsonApi\Laravel\Routing\Registrar::class);
 
             $jsonApiRoute->server('v1')
-                ->prefix('v1')
-                ->resources(function ($server) {
-                    $server->resource('posts', JsonApiController::class)->relationships(function ($relationships) {
-                        $relationships->hasMany('comments');
-                    });
-                    $server->resource('categories', JsonApiController::class);
-                    $server->resource('comments', JsonApiController::class);
-                });
+              ->prefix('v1')
+              ->namespace('Api\V1')
+              ->resources(function ($server) {
+                  /** Posts */
+                  $server->resource('posts')->relationships(function ($relationships) {
+                      $relationships->hasOne('author')->readOnly();
+                      $relationships->hasMany('comments')->readOnly();
+                      $relationships->hasMany('media');
+                      $relationships->hasMany('tags');
+                  })->actions('-actions', function ($actions) {
+                      $actions->delete('purge');
+                      $actions->withId()->post('publish');
+                  });
+
+                  /** Videos */
+                  $server->resource('videos')->relationships(function ($relationships) {
+                      $relationships->hasMany('tags');
+                  });
+              });
         });
     }
 

@@ -21,10 +21,10 @@ namespace LaravelJsonApi\OpenApiSpec\Tests\Support\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use LaravelJsonApi\OpenApiSpec\Tests\Support\Database\Factories\CommentFactory;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use LaravelJsonApi\OpenApiSpec\Tests\Support\Database\Factories\TagFactory;
 
-class Comment extends Model
+class Tag extends Model
 {
 
     use HasFactory;
@@ -33,22 +33,22 @@ class Comment extends Model
     /**
      * @var string[]
      */
-    protected $fillable = ['content'];
+    protected $fillable = ['name'];
 
     /**
-     * @return BelongsTo
+     * @return MorphToMany
      */
-    public function post(): BelongsTo
+    public function posts(): MorphToMany
     {
-        return $this->belongsTo(Post::class);
+        return $this->morphedByMany(Post::class, 'taggable');
     }
 
     /**
-     * @return BelongsTo
+     * @return MorphToMany
      */
-    public function user(): BelongsTo
+    public function videos(): MorphToMany
     {
-        return $this->belongsTo(User::class);
+        return $this->morphedByMany(Video::class, 'taggable');
     }
 
     /**
@@ -58,6 +58,6 @@ class Comment extends Model
      */
     protected static function newFactory()
     {
-        return new CommentFactory();
+        return new TagFactory();
     }
 }

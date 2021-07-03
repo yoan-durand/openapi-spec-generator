@@ -20,7 +20,7 @@ Designed to work with [Laravel JSON:API](https://laraveljsonapi.io/)
 - [ ] Add custom queries/filters
 - [ ] Add custom actions
 - [ ] Tidy up the code!!
-- [ ] Add tests (Use the dummy by laraveljsonapi to integrate all features)
+- [x] Add tests (Use the dummy by laraveljsonapi to integrate all features)
 - [ ] Use interface + traits on Server/Schema to provide description etc
 
 🙏 Based upon initial prototype by [martianatwork](https://github.com/martianatwork)
