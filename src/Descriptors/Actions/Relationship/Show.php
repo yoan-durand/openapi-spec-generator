@@ -14,6 +14,11 @@ class Show extends ActionsDescriptor
     protected ?string $relation;
 
     /**
+     * @param  \LaravelJsonApi\OpenApiSpec\Actions\GenerateOpenAPISpec  $generator
+     * @param  \LaravelJsonApi\Contracts\Schema\Schema  $schema
+     * @param  \LaravelJsonApi\OpenApiSpec\Descriptors\Actions\Route  $route
+     *
+     * @todo Implement request/response
      */
     protected function describeRoute(
       GenerateOpenAPISpec $generator,
