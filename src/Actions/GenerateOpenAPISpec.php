@@ -28,6 +28,7 @@ use LaravelJsonApi\Contracts\Schema\Attribute;
 use LaravelJsonApi\Contracts\Schema\PolymorphicRelation;
 use LaravelJsonApi\Contracts\Schema\Schema;
 use LaravelJsonApi\Contracts\Server\Server;
+use LaravelJsonApi\Core\Resources\JsonApiResource;
 use LaravelJsonApi\Core\Support\Str;
 use LaravelJsonApi\Eloquent\Fields\ArrayHash;
 use LaravelJsonApi\Eloquent\Fields\ArrayList;
@@ -35,11 +36,10 @@ use LaravelJsonApi\Eloquent\Fields\Boolean;
 use LaravelJsonApi\Eloquent\Fields\ID;
 use LaravelJsonApi\Eloquent\Fields\Map;
 use LaravelJsonApi\Eloquent\Fields\Number;
-use LaravelJsonApi\Eloquent\Fields\Relations\MorphTo;
-use LaravelJsonApi\Eloquent\Fields\Relations\MorphToMany;
 use LaravelJsonApi\Eloquent\Fields\Relations\Relation;
 use LaravelJsonApi\Eloquent\Fields\Relations\ToMany;
 use LaravelJsonApi\Eloquent\Fields\Relations\ToOne;
+use LaravelJsonApi\Eloquent\Filters\WhereIdIn;
 use Throwable;
 
 class GenerateOpenAPISpec
@@ -58,6 +58,8 @@ class GenerateOpenAPISpec
     protected array $paths = [];
 
     protected Server $jsonapiServer;
+
+    protected array $resources = [];
 
     public function __construct(string $serverKey)
     {
@@ -127,6 +129,7 @@ class GenerateOpenAPISpec
 
 
         if ( ! $this->openApi->validate()) {
+
             throw new Error("Validation failed.");
         }
         return $this->openApi;
@@ -155,9 +158,9 @@ class GenerateOpenAPISpec
 
         $operationId = collect($routeNameSegments)->join('_');
 
-        $uri = $route->uri();
+        $uri = '/'.$route->uri();
 
-        $routeUri = '/'.str_replace($this->jsonapiServer->baseUri(), '', $uri);
+        $routeUri = str_replace($this->jsonapiServer->baseUri(), '', $uri);
 
         // @todo extract parameters by regex
         $hasPathParameter = \Str::contains($routeUri, '{');
@@ -181,21 +184,33 @@ class GenerateOpenAPISpec
             foreach ($schema->filters() as $filter) {
                 $key = $filter->key();
 
-                try {
-                    $examples = $schema::model()::all()
-                      ->pluck($key)
-                      ->mapWithKeys(function ($f) {
+                if ($filter instanceof WhereIdIn) {
+                    $examples = $this->getModelResources($schema::model())
+                      ->mapWithKeys(function (JsonApiResource $resource) {
+                          $id = $resource->id();
                           return [
-                            $f => new Example([
-                              'value' => $f,
+                            $id => new Example([
+                              'value' => $id,
                             ]),
                           ];
                       })
                       ->toArray();
-                } catch (\Exception) {
-                    $examples = [];
+                } else {
+                    try {
+                        $examples = $schema::model()::all()
+                          ->pluck($key)
+                          ->mapWithKeys(function ($f) {
+                              return [
+                                $f => new Example([
+                                  'value' => $f,
+                                ]),
+                              ];
+                          })
+                          ->toArray();
+                    } catch (\Exception) {
+                        $examples = [];
+                    }
                 }
-
 
                 $parameters[] = new Parameter([
                   'name' => "filter[{$filter->key()}]",
@@ -208,6 +223,7 @@ class GenerateOpenAPISpec
                   ]),
                 ]);
             }
+
             foreach ([
                        "sort",
                        "pageSize",
@@ -446,23 +462,21 @@ class GenerateOpenAPISpec
               ],
             ]));
 
-            $models = ($schema::model())::all();
+            $examples = $this->getModelResources($schema::model())
+              ->mapWithKeys(function ($model) {
+                  $id = $model->id();
+                  return [
+                    $id => new Example([
+                      'value' => $id,
+                    ]),
+                  ];
+              })->toArray();
             $parameters[] = new Parameter([
               'name' => $resourceIdName,
               'in' => 'path',
               'required' => true,
               'allowEmptyValue' => false,
-              "examples" => optional($models)->mapWithKeys(function (
-                $model
-              ) use ($schema) {
-                  return [
-                    $model->{$schema->id()
-                      ->column() ?? $model->getRouteKeyName()} => new Example([
-                      "value" => $model->{$schema->id()
-                        ->column() ?? $model->getRouteKeyName()},
-                    ]),
-                  ];
-              })->toArray(),
+              "examples" => $examples,
               'schema' => new OASchema([
                 'title' => $resourceType,
               ]),
@@ -517,9 +531,10 @@ class GenerateOpenAPISpec
 
             $relationSchemas = [];
 
-            $modelClass = $schema::model();
-            $model = $modelClass::first();
-
+            /** @var \LaravelJsonApi\Core\Resources\JsonApiResource $resource */
+            $resource = $this->getModelResources($schema::model())->first();
+            $model = $resource->resource;
+            $fieldValues = collect($resource->attributes(null))->toArray();
             foreach ($schema->fields() as $field) {
 
                 $fieldSchema = new OASchema([
@@ -543,7 +558,7 @@ class GenerateOpenAPISpec
 
                     // Try to get example data
                     try {
-                        $fieldSchema->example = $model?->{$field->column()};
+                        $fieldSchema->example = $fieldValues[$field->name()];
                     } catch (Throwable) {
                     }
 
@@ -631,7 +646,7 @@ class GenerateOpenAPISpec
                 "id" => new OASchema([
                   'title' => 'id',
                   'type' => Type::STRING,
-                  "example" => optional($model)->id,
+                  "example" => $resource?->id(),
                 ]),
                 "attributes" => new OASchema([
                   'title' => 'attributes',
@@ -1241,6 +1256,19 @@ class GenerateOpenAPISpec
             [$name => $requestBody])
         );
         return new Reference(['$ref' => "#/components/requestBodies/$name"]);
+    }
+
+    protected function getModelResources(string $model): Collection
+    {
+        if ( ! isset($this->resources[$model])) {
+            $resources = $model::all()->map(function ($model) {
+                return $this->jsonapiServer->resources()->create($model);
+            });
+
+            $this->resources[$model] = $resources;
+        }
+
+        return $this->resources[$model];
     }
 
 }
