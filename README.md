@@ -24,6 +24,7 @@ Designed to work with [Laravel JSON:API](https://laraveljsonapi.io/)
 - [ ] Tidy up the code!!
 - [x] Add tests (Use the dummy by laraveljsonapi to integrate all features)
 - [ ] Use interface + traits on Server/Schema to provide description etc
+- [ ] Transition to Generator classes per generated entity (paths, parameters, schemas etc)
 
 🙏 Based upon initial prototype by [martianatwork](https://github.com/martianatwork)
 

@@ -19,7 +19,6 @@ use cebe\openapi\spec\Schema as OASchema;
 use cebe\openapi\spec\Server as OAServer;
 use cebe\openapi\spec\ServerVariable as OAServerVariable;
 use cebe\openapi\spec\Type;
-use cebe\openapi\SpecBaseObject;
 use Error;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
@@ -28,7 +27,6 @@ use LaravelJsonApi\Contracts\Schema\Attribute;
 use LaravelJsonApi\Contracts\Schema\PolymorphicRelation;
 use LaravelJsonApi\Contracts\Schema\Schema;
 use LaravelJsonApi\Contracts\Server\Server;
-use LaravelJsonApi\Core\Resources\JsonApiResource;
 use LaravelJsonApi\Core\Support\Str;
 use LaravelJsonApi\Eloquent\Fields\ArrayHash;
 use LaravelJsonApi\Eloquent\Fields\ArrayList;
@@ -39,7 +37,7 @@ use LaravelJsonApi\Eloquent\Fields\Number;
 use LaravelJsonApi\Eloquent\Fields\Relations\Relation;
 use LaravelJsonApi\Eloquent\Fields\Relations\ToMany;
 use LaravelJsonApi\Eloquent\Fields\Relations\ToOne;
-use LaravelJsonApi\Eloquent\Filters\WhereIdIn;
+use LaravelJsonApi\OpenApiSpec\Descriptors\DescriptorContainer;
 use Throwable;
 
 class GenerateOpenAPISpec
@@ -61,9 +59,12 @@ class GenerateOpenAPISpec
 
     protected array $resources = [];
 
+    protected DescriptorContainer $descriptorContainer;
+
     public function __construct(string $serverKey)
     {
         $this->serverKey = $serverKey;
+        $this->descriptorContainer = app()->make(DescriptorContainer::class);
     }
 
     /**
@@ -182,46 +183,7 @@ class GenerateOpenAPISpec
 
         if ($action === 'index') {
             foreach ($schema->filters() as $filter) {
-                $key = $filter->key();
-
-                if ($filter instanceof WhereIdIn) {
-                    $examples = $this->getModelResources($schema::model())
-                      ->mapWithKeys(function (JsonApiResource $resource) {
-                          $id = $resource->id();
-                          return [
-                            $id => new Example([
-                              'value' => $id,
-                            ]),
-                          ];
-                      })
-                      ->toArray();
-                } else {
-                    try {
-                        $examples = $schema::model()::all()
-                          ->pluck($key)
-                          ->mapWithKeys(function ($f) {
-                              return [
-                                $f => new Example([
-                                  'value' => $f,
-                                ]),
-                              ];
-                          })
-                          ->toArray();
-                    } catch (\Exception) {
-                        $examples = [];
-                    }
-                }
-
-                $parameters[] = new Parameter([
-                  'name' => "filter[{$filter->key()}]",
-                  'in' => 'query',
-                  'required' => false,
-                  'allowEmptyValue' => true,
-                  'examples' => $examples,
-                  'schema' => new OASchema([
-                    "type" => Type::STRING,
-                  ]),
-                ]);
+                $parameters[] = $this->descriptorContainer->getDescriptor($filter)->describe($this, $schema, $filter);
             }
 
             foreach ([
@@ -1258,7 +1220,7 @@ class GenerateOpenAPISpec
         return new Reference(['$ref' => "#/components/requestBodies/$name"]);
     }
 
-    protected function getModelResources(string $model): Collection
+    public function getModelResources(string $model): Collection
     {
         if ( ! isset($this->resources[$model])) {
             $resources = $model::all()->map(function ($model) {
