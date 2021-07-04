@@ -5,16 +5,12 @@ namespace LaravelJsonApi\OpenApiSpec\Actions;
 
 
 use cebe\openapi\spec\Components;
-use cebe\openapi\spec\Example;
 use cebe\openapi\spec\MediaType;
 use cebe\openapi\spec\OpenApi;
-use cebe\openapi\spec\Operation;
 use cebe\openapi\spec\Parameter;
 use cebe\openapi\spec\PathItem;
 use cebe\openapi\spec\Reference;
 use cebe\openapi\spec\RequestBody;
-use cebe\openapi\spec\Response;
-use cebe\openapi\spec\Responses;
 use cebe\openapi\spec\Schema as OASchema;
 use cebe\openapi\spec\Server as OAServer;
 use cebe\openapi\spec\ServerVariable as OAServerVariable;
@@ -24,7 +20,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str as StrStr;
 use LaravelJsonApi\Contracts\Schema\Attribute;
-use LaravelJsonApi\Contracts\Schema\PolymorphicRelation;
 use LaravelJsonApi\Contracts\Schema\Schema;
 use LaravelJsonApi\Contracts\Server\Server;
 use LaravelJsonApi\Core\Support\Str;
@@ -35,16 +30,12 @@ use LaravelJsonApi\Eloquent\Fields\ID;
 use LaravelJsonApi\Eloquent\Fields\Map;
 use LaravelJsonApi\Eloquent\Fields\Number;
 use LaravelJsonApi\Eloquent\Fields\Relations\Relation;
-use LaravelJsonApi\Eloquent\Fields\Relations\ToMany;
 use LaravelJsonApi\Eloquent\Fields\Relations\ToOne;
 use LaravelJsonApi\OpenApiSpec\Descriptors\DescriptorContainer;
 use Throwable;
 
 class GenerateOpenAPISpec
 {
-
-    public const MEDIA_TYPE = 'application/vnd.api+json';
-
     public const OA_VERSION = '3.0.2';
 
     protected string $serverKey;
@@ -56,6 +47,14 @@ class GenerateOpenAPISpec
     protected array $paths = [];
 
     protected Server $jsonapiServer;
+
+    /**
+     * @return \LaravelJsonApi\Contracts\Server\Server
+     */
+    public function getJsonapiServer(): Server
+    {
+        return $this->jsonapiServer;
+    }
 
     protected array $resources = [];
 
@@ -69,7 +68,6 @@ class GenerateOpenAPISpec
 
     /**
      * @throws \cebe\openapi\exceptions\TypeErrorException
-     * @throws \cebe\openapi\exceptions\UnknownPropertyException
      * @throws \Exception
      */
     public function generate(): OpenApi
@@ -140,339 +138,46 @@ class GenerateOpenAPISpec
      * @param  mixed  $method
      * @param  mixed  $route
      *
-     * @throws \cebe\openapi\exceptions\TypeErrorException
      */
     protected function generateOperationForMethod(
       mixed $method,
       \Illuminate\Routing\Route $route,
     ): void {
-        $serverKey = $this->serverKey;
+
         $routeNameSegments = explode('.', $route->getName());
+        $routeNameSegments = array_slice(
+          $routeNameSegments,
+          array_search($this->jsonapiServer->name(), $routeNameSegments) + 1
+        );
 
-        $index = array_search($serverKey, $routeNameSegments);
-        $routeNameSegments = array_slice($routeNameSegments, $index + 1);
-        $resourceType = $route->defaults['resource_type'];
-        [, $action] = $routeNameSegments;
+        $resource = null;
+        $action = null;
+        $relation = null;
 
-
-        $schema = $this->jsonapiServer->schemas()->schemaFor($resourceType);
-
-        $operationId = collect($routeNameSegments)->join('_');
-
-        $uri = '/'.$route->uri();
-
-        $routeUri = str_replace($this->jsonapiServer->baseUri(), '', $uri);
-
-        // @todo extract parameters by regex
-        $hasPathParameter = \Str::contains($routeUri, '{');
-        if ($hasPathParameter) {
-            $resourceIdName = $route->defaults['resource_id_name'];
+        if(count($routeNameSegments) === 2){
+            [$resource, $action] = $routeNameSegments;
+        }
+        elseif (count($routeNameSegments) === 3){
+            [$resource, $relation, $action] = $routeNameSegments;
         }
 
+        $schema = $this->jsonapiServer->schemas()->schemaFor($resource);
 
-        $parameters = [];
-        $responses = new Responses([]);
-        /** @var RequestBody|Reference|null $requestBody */
-        $requestBody = null;
-
+        if($relation === null && $schema->isRelationship($action)){
+            $relation = $action;
+            $action = 'showRelated';
+        }
 
         if ($method === 'HEAD') {
             return;
         }
+        $routeAttributes = new \LaravelJsonApi\OpenApiSpec\Descriptors\Actions\Route($route, $resource, $action, $relation);
+
+        $operation = $this->descriptorContainer->getDescriptor($routeAttributes)->describe($this, $schema, $routeAttributes);
 
 
-        if ($action === 'index') {
-            foreach ($schema->filters() as $filter) {
-                $parameters[] = $this->descriptorContainer->getDescriptor($filter)->describe($this, $schema, $filter);
-            }
-
-            foreach ([
-                       "sort",
-                       "pageSize",
-                       "pageNumber",
-                       "pageLimit",
-                       "pageOffset",
-                     ] as $parameter) {
-                $parameters[] = ['$ref' => "#/components/parameters/$parameter"];
-            }
-            $ref = $this->generateOAGetMultipleResponseSchema($schema,
-              StrStr::singular($resourceType),
-              $resourceType);
-            $responses->addResponse(200, new Response([
-              'description' => ucfirst($action)." $resourceType",
-              "content" => [
-                self::MEDIA_TYPE => new MediaType([
-                  "schema" => new OASchema([
-                    'oneOf' => [
-                      $ref,
-                    ],
-                  ]),
-                ]),
-              ],
-            ]));
-        } elseif ($action === 'show') {
-            $ref = $this->generateOAGetResponseSchema($schema,
-              StrStr::singular($resourceType),
-              $resourceType);
-
-            $responses->addResponse(200, new Response([
-              'description' => ucfirst($action)." $resourceType",
-              "content" => [
-                self::MEDIA_TYPE => new MediaType([
-                  "schema" => new OASchema([
-                    'oneOf' => [
-                      $ref,
-                    ],
-                  ]),
-                ]),
-              ],
-            ]));
-        } elseif ($action === 'store') {
-
-            $requestBody = $this->generateOAStoreRequestBody($schema,
-              StrStr::singular($resourceType),
-              $resourceType);
-
-            $ref = $this->generateOAGetResponseSchema($schema,
-              StrStr::singular($resourceType),
-              $resourceType);
-
-            $responses->addResponse(201, new Response([
-              'description' => ucfirst($action)." $resourceType",
-              "content" => [
-                self::MEDIA_TYPE => new MediaType([
-                  "schema" => new OASchema([
-                    'oneOf' => [
-                      $ref,
-                    ],
-                  ]),
-                ]),
-              ],
-            ]));
-        } elseif ($action === 'update') {
-
-
-            $requestBody = $this->generateOAUpdateRequestBody($schema,
-              StrStr::singular($resourceType),
-              $resourceType);
-
-            $ref = $this->generateOAGetResponseSchema($schema,
-              StrStr::singular($resourceType),
-              $resourceType);
-
-            $responses->addResponse(201, new Response([
-              'description' => ucfirst($action)." $resourceType",
-              "content" => [
-                self::MEDIA_TYPE => new MediaType([
-                  "schema" => new OASchema([
-                    "oneOf" => [
-                      $ref,
-                    ],
-                  ]),
-                ]),
-              ],
-            ]));
-        } elseif ($action === 'delete') {
-            $responses->addResponse(204, new Response([
-              'description' => ucfirst($action)." $resourceType",
-            ]));
-        } elseif ($schema->isRelationship($action)) {
-            // Drop out, dont know yet what todo
-
-            $relation = $schema->relationship($action);
-
-            $singular = $relation->toOne();
-
-            $targetSchemaName = $relation->inverse();
-
-
-            if ($relation instanceof PolymorphicRelation) {
-                $targetSchemaNames = $relation->inverseTypes();
-
-                $targetOADataSchemas = collect($targetSchemaNames)
-                  ->combine(
-                    collect($targetSchemaNames)
-                      ->map(
-                        function ($targetSchemaName) {
-                            return $this->jsonapiServer->schemas()
-                              ->schemaFor($targetSchemaName);
-                        })
-                  )
-                  ->map(function ($schema, $name) {
-                      return $this->generateOAGetDataSchema(
-                        $schema,
-                        StrStr::singular($name),
-                        $name
-                      );
-                  });
-
-                $singular = ! ($relation instanceof ToMany);
-
-                if ($singular) {
-                    $responses->addResponse(200, new Response([
-                      'description' => ucfirst($action)." $resourceType",
-                      "content" => [
-                        self::MEDIA_TYPE => new MediaType([
-                          "schema" => new OASchema([
-                            'properties' => [
-                              'jsonapi' => $this->getDefaultJsonApiSchema(),
-                              'data' => new OASchema([
-                                'oneOf' => $targetOADataSchemas->toArray(),
-                              ]),
-                            ],
-                          ]),
-                        ]),
-                      ],
-                    ]));
-                } else {
-                    $responses->addResponse(200, new Response([
-                      'description' => ucfirst($action)." $resourceType",
-                      "content" => [
-                        self::MEDIA_TYPE => new MediaType([
-                          "schema" => new OASchema([
-                            'properties' => [
-                              'jsonapi' => $this->getDefaultJsonApiSchema(),
-                              'data' => new OASchema([
-                                'type' => Type::ARRAY,
-                                'items' => new OASchema([
-                                  'oneOf' => $targetOADataSchemas->toArray(),
-                                ]),
-                              ]),
-                            ],
-                          ]),
-                        ]),
-                      ],
-                    ]));
-                }
-            } else {
-                $targetSchema = $this->jsonapiServer->schemas()
-                  ->schemaFor($targetSchemaName);
-                if ($singular) {
-                    $ref = $this->generateOAGetResponseSchema(
-                      $targetSchema,
-                      StrStr::singular($targetSchemaName),
-                      $targetSchemaName
-                    );
-                } else {
-                    $ref = $this->generateOAGetMultipleResponseSchema(
-                      $targetSchema,
-                      StrStr::singular($targetSchemaName),
-                      $targetSchemaName
-                    );
-                }
-
-                $responses->addResponse(200, new Response([
-                  'description' => ucfirst($action)." $resourceType",
-                  "content" => [
-                    self::MEDIA_TYPE => new MediaType([
-                      "schema" => new OASchema([
-                        'oneOf' => [
-                          $ref,
-                        ],
-                      ]),
-                    ]),
-                  ],
-                ]));
-            }
-        }
-
-
-        $responses->addResponse(401, new Response([
-          'description' => "Unauthorized Action",
-          "content" => [
-            self::MEDIA_TYPE => new MediaType([
-              "schema" => new OASchema([
-                "oneOf" => [
-                  new Reference([
-                    '$ref' => "#/components/schemas/unauthorized",
-                  ]),
-                ],
-              ]),
-            ]),
-          ],
-        ]));
-
-        $responses->addResponse(403, new Response([
-          'description' => "Forbidden Action",
-          "content" => [
-            self::MEDIA_TYPE => new MediaType([
-              "schema" => new OASchema([
-                "oneOf" => [
-                  new Reference([
-                    '$ref' => "#/components/schemas/forbidden",
-                  ]),
-                ],
-              ]),
-            ]),
-          ],
-        ]));
-
-
-        if ($hasPathParameter) {
-            $responses->addResponse(404, new Response([
-              'description' => "Content Not Found",
-              "content" => [
-                self::MEDIA_TYPE => new MediaType([
-                  "schema" => new OASchema([
-                    "oneOf" => [
-                      new Reference([
-                        '$ref' => "#/components/schemas/not_found",
-                      ]),
-                    ],
-                  ]),
-                ]),
-              ],
-            ]));
-
-            $examples = $this->getModelResources($schema::model())
-              ->mapWithKeys(function ($model) {
-                  $id = $model->id();
-                  return [
-                    $id => new Example([
-                      'value' => $id,
-                    ]),
-                  ];
-              })->toArray();
-            $parameters[] = new Parameter([
-              'name' => $resourceIdName,
-              'in' => 'path',
-              'required' => true,
-              'allowEmptyValue' => false,
-              "examples" => $examples,
-              'schema' => new OASchema([
-                'title' => $resourceType,
-              ]),
-            ]);
-        }
-
-        $summary = match ($action) {
-            "index" => "Get all $resourceType",
-            "show" => "Get a ".StrStr::singular($resourceType),
-            "store" => "Store a new ".StrStr::singular($resourceType),
-            "update" => "Update the ".StrStr::singular($resourceType),
-            "delete" => "Delete the ".StrStr::singular($resourceType),
-            default => ucfirst($action),
-        };
-
-
-        $operation = new Operation([
-          "summary" => $this->getSummary($serverKey,
-              $operationId) ?? $summary,
-          "description" => $this->getDescription($serverKey,
-              $operationId) ?? "",
-          "operationId" => $operationId,
-          "parameters" => $parameters,
-          "responses" => $responses,
-          "tags" => [
-            ucfirst($resourceType),
-            ...$this->getTags($serverKey, $operationId),
-          ],
-        ]);
-
-        if ($requestBody) {
-            $operation->requestBody = $requestBody;
-        }
-
+        $uri = '/'.$route->uri();
+        $routeUri = str_replace($this->jsonapiServer->baseUri(), '', $uri);
 
         if ( ! isset($this->paths[$routeUri])) {
             $this->paths[$routeUri] = [];
@@ -483,7 +188,7 @@ class GenerateOpenAPISpec
     /**
      * @throws \cebe\openapi\exceptions\TypeErrorException
      */
-    protected function generateOAGetDataSchema(
+    public function generateOAGetDataSchema(
       Schema $schema,
       string $schemaName,
       string $schemaNamePlural,
@@ -643,7 +348,7 @@ class GenerateOpenAPISpec
     /**
      * @throws \cebe\openapi\exceptions\TypeErrorException
      */
-    protected function generateOAGetResponseSchema(
+    public function generateOAGetResponseSchema(
       Schema $schema,
       string $schemaName,
       string $schemaNamePlural,
@@ -677,7 +382,7 @@ class GenerateOpenAPISpec
     /**
      * @throws \cebe\openapi\exceptions\TypeErrorException
      */
-    protected function generateOAGetMultipleResponseSchema(
+    public function generateOAGetMultipleResponseSchema(
       Schema $schema,
       string $schemaName,
       string $schemaNamePlural,
@@ -705,7 +410,7 @@ class GenerateOpenAPISpec
     /**
      * @throws \cebe\openapi\exceptions\TypeErrorException
      */
-    protected function generateOAStoreRequestBody(
+    public function generateOAStoreRequestBody(
       Schema $schema,
       string $schemaName,
       string $schemaNamePlural,
@@ -846,7 +551,7 @@ class GenerateOpenAPISpec
     /**
      * @throws \cebe\openapi\exceptions\TypeErrorException
      */
-    protected function generateOAUpdateRequestBody(
+    public function generateOAUpdateRequestBody(
       Schema $schema,
       string $schemaName,
       string $schemaNamePlural,
@@ -1123,43 +828,40 @@ class GenerateOpenAPISpec
     }
 
     /**
-     * @param $serverKey
      * @param $operationId
      *
      * @return string|null
      */
-    protected function getSummary($serverKey, $operationId): ?string
+    public function getSummary($operationId): ?string
     {
-        return config("openapi.servers.$serverKey.operations.$operationId.summary");
+        return config("openapi.servers.{$this->jsonapiServer->name()}.operations.$operationId.summary");
     }
 
     /**
-     * @param $serverKey
      * @param $operationId
      *
      * @return string|null
      */
-    protected function getDescription($serverKey, $operationId): ?string
+    public function getDescription($operationId): ?string
     {
-        return config("openapi.servers.$serverKey.operations.$operationId.description");
+        return config("openapi.servers.{$this->jsonapiServer->name()}.operations.$operationId.description");
     }
 
     /**
-     * @param $serverKey
      * @param $operationId
      *
      * @return string[]
      */
-    protected function getTags($serverKey, $operationId): array
+    public function getTags($operationId): array
     {
-        return config("openapi.servers.$serverKey.operations.$operationId.extra_tags",
+        return config("openapi.servers.{$this->jsonapiServer->name()}.operations.$operationId.extra_tags",
           []);
     }
 
     /**
      * @throws \cebe\openapi\exceptions\TypeErrorException
      */
-    protected function getDefaultJsonApiSchema(): OASchema
+    public function getDefaultJsonApiSchema(): OASchema
     {
         return new OASchema([
           'title' => 'jsonapi',
@@ -1231,6 +933,14 @@ class GenerateOpenAPISpec
         }
 
         return $this->resources[$model];
+    }
+
+    /**
+     * @return \cebe\openapi\spec\OpenApi
+     */
+    public function getOpenApi(): OpenApi
+    {
+        return $this->openApi;
     }
 
 }

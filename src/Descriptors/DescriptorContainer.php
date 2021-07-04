@@ -5,6 +5,7 @@ namespace LaravelJsonApi\OpenApiSpec\Descriptors;
 
 
 use LaravelJsonApi\Contracts\Schema\Filter;
+use LaravelJsonApi\OpenApiSpec\Descriptors\Actions\Route;
 use LaravelJsonApi\OpenApiSpec\Descriptors\Concerns\Descriptor;
 use LaravelJsonApi\OpenApiSpec\Descriptors\Concerns\ProvidesDescriptor;
 use LaravelJsonApi\OpenApiSpec\Descriptors\Concerns\SelfDescribing;
@@ -14,6 +15,7 @@ use LaravelJsonApi\OpenApiSpec\Descriptors\Schema\Filters\WhereIdIn;
 use LaravelJsonApi\OpenApiSpec\Descriptors\Schema\Filters\WhereIn;
 use LaravelJsonApi\OpenApiSpec\Descriptors\Schema\Filters\WithTrashed;
 use LogicException;
+use LaravelJsonApi\OpenApiSpec\Descriptors\Actions;
 
 class DescriptorContainer
 {
@@ -27,6 +29,21 @@ class DescriptorContainer
       Scope::class,
       WithTrashed::class,
       Where::class,
+    ];
+
+    protected array $actions = [
+      Actions\Index::class,
+      Actions\Show::class,
+      Actions\Store::class,
+      Actions\Update::class,
+      Actions\Destroy::class,
+      Actions\Relationship\ShowRelated::class,
+      Actions\Relationship\Attach::class,
+      Actions\Relationship\Detach::class,
+      Actions\Relationship\Show::class,
+      Actions\Relationship\Update::class,
+        // Fallback
+      Actions\CustomAction::class,
     ];
 
     public function getDescriptor(mixed $needsDescription): Descriptor
@@ -49,6 +66,8 @@ class DescriptorContainer
 
         return match (true) {
             $for instanceof Filter => $this->getFilterDescriptor($for),
+            $for instanceof Route => $this->getActionDescriptor($for),
+            default => throw new LogicException("Can't describe ".$for::class)
         };
     }
 
@@ -60,6 +79,16 @@ class DescriptorContainer
             }
         }
         throw new LogicException("Can resolve Descriptor for ".$for::class);
+    }
+
+    protected function getActionDescriptor(Route $for): ?Descriptor
+    {
+        foreach ($this->actions as $descriptor) {
+            if ($descriptor::canDescribe($for)) {
+                return new $descriptor();
+            }
+        }
+        throw new LogicException("Can resolve Descriptor for ".$for->route->getName()." action");
     }
 
 }
