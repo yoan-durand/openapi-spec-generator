@@ -27,6 +27,8 @@ abstract class ActionsDescriptor implements Descriptor
 
     protected Server $server;
 
+    protected Schema $schema;
+
     protected string $operationId;
 
     protected string $resourceType;
@@ -75,8 +77,9 @@ abstract class ActionsDescriptor implements Descriptor
         $this->resourceType = $entity->resource;
         $this->action = $entity->action;
 
-
         $this->operationId = collect([$entity->resource, $entity->relation, $entity->action])->join('_');
+
+        $this->schema = $this->server->schemas()->schemaFor($this->resourceType);
 
         $this->responses = new Responses([]);
 
