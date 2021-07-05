@@ -3,39 +3,16 @@
 
 namespace LaravelJsonApi\OpenApiSpec\Descriptors\Actions\Relationship;
 
-
-use LaravelJsonApi\Contracts\Schema\Schema;
-use LaravelJsonApi\OpenApiSpec\Actions\GenerateOpenAPISpec;
-use LaravelJsonApi\OpenApiSpec\Descriptors\Actions\ActionsDescriptor;
-use LaravelJsonApi\OpenApiSpec\Descriptors\Actions\Route;
-
-class Detach extends ActionsDescriptor
+class Detach extends Attach
 {
-    protected ?string $relation;
-
-    /**
-     * @param  \LaravelJsonApi\OpenApiSpec\Actions\GenerateOpenAPISpec  $generator
-     * @param  \LaravelJsonApi\Contracts\Schema\Schema  $schema
-     * @param  \LaravelJsonApi\OpenApiSpec\Descriptors\Actions\Route  $route
-     *
-     * @todo Implement request/response
-     */
-    protected function describeRoute(
-      GenerateOpenAPISpec $generator,
-      Schema $schema,
-      Route $route
-    ): void {
-        $this->relation = $route->relation;
-    }
-
     protected function getSummary(): string
     {
-        return "Attach {$this->relation}";
+        return "Detach {$this->relation}";
     }
 
-    protected static function describesRelation(): bool
+    protected function getDescription(): string
     {
-        return  true;
+        return 'Detaches the given members from the relationship.';
     }
 
     protected static function describesAction(): string

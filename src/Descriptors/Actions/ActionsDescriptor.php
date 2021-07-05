@@ -156,7 +156,7 @@ abstract class ActionsDescriptor implements Descriptor
           "summary" => $generator->getSummary(
               $this->operationId) ?? $this->getSummary(),
           "description" => $generator->getDescription(
-              $this->operationId) ?? "",
+              $this->operationId) ?? $this->getDescription(),
           "operationId" => $this->operationId,
           "parameters" => $this->parameters,
           "responses" => $this->responses,
@@ -171,6 +171,10 @@ abstract class ActionsDescriptor implements Descriptor
         }
 
         return $operation;
+    }
+
+    protected function getDescription(): string{
+        return '';
     }
 
     abstract protected function describeRoute(
