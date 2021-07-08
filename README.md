@@ -11,8 +11,10 @@ Designed to work with [Laravel JSON:API](https://laraveljsonapi.io/)
 - [x] Add extra operation descriptions via config
 - [x] Add in tags & x-tagGroups (via config)
 - [ ] Consider field attributes
-  - [ ] readonly (create/update)
-  - [ ] hidden
+  - [x] bool readonly
+  - [x] bool hidden
+  - [ ] closure based readonly (create/update)
+  - [ ] closure based hidden
 - [x] Split schemas/requests/responses by action
 - [ ] Fix includes and relations
   - [x] Add relationship routes

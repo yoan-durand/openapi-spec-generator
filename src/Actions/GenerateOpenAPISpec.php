@@ -19,12 +19,13 @@ use Error;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str as StrStr;
-use LaravelJsonApi\Contracts\Schema\Attribute;
+use LaravelJsonApi\Contracts\Schema\Field;
 use LaravelJsonApi\Contracts\Schema\Schema;
 use LaravelJsonApi\Contracts\Server\Server;
 use LaravelJsonApi\Core\Support\Str;
 use LaravelJsonApi\Eloquent\Fields\ArrayHash;
 use LaravelJsonApi\Eloquent\Fields\ArrayList;
+use LaravelJsonApi\Eloquent\Fields\Attribute;
 use LaravelJsonApi\Eloquent\Fields\Boolean;
 use LaravelJsonApi\Eloquent\Fields\ID;
 use LaravelJsonApi\Eloquent\Fields\Map;
@@ -214,6 +215,9 @@ class GenerateOpenAPISpec
                 }
 
                 if ($field instanceof Attribute) {
+                    if($field->isHidden(null)){
+                        continue;
+                    }
                     $fieldSchema->type = match (true) {
                         $field instanceof Boolean => Type::BOOLEAN,
                         $field instanceof Number => Type::NUMBER,
@@ -436,7 +440,12 @@ class GenerateOpenAPISpec
                     continue;
                 }
 
+
                 if ($field instanceof Attribute) {
+                    if($field->isReadOnly(null)){
+                        continue;
+                    }
+
                     $fieldSchema->type = match (true) {
                         $field instanceof Boolean => Type::BOOLEAN,
                         $field instanceof Number => Type::NUMBER,
@@ -578,6 +587,9 @@ class GenerateOpenAPISpec
                 }
 
                 if ($field instanceof Attribute) {
+                    if($field->isReadOnly(null)){
+                        continue;
+                    }
                     $fieldSchema->type = match (true) {
                         $field instanceof Boolean => Type::BOOLEAN,
                         $field instanceof Number => Type::NUMBER,
