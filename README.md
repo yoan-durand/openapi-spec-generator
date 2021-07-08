@@ -15,6 +15,7 @@ Designed to work with [Laravel JSON:API](https://laraveljsonapi.io/)
   - [x] bool hidden
   - [ ] closure based readonly (create/update)
   - [ ] closure based hidden
+- [ ] List sortable fields 
 - [x] Split schemas/requests/responses by action
 - [ ] Fix includes and relations
   - [x] Add relationship routes
