@@ -10,7 +10,7 @@ class Update extends Attach
 
     protected function getSummary(): string
     {
-        return "Update related {$this->relation}";
+        return "Update {$this->relation} relation";
     }
 
     protected static function describesAction(): string
