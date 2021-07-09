@@ -10,24 +10,25 @@ Designed to work with [Laravel JSON:API](https://laraveljsonapi.io/)
 - [x] Get basic test suite running with GitHub Actions
 - [x] Add extra operation descriptions via config
 - [x] Add in tags & x-tagGroups (via config)
+- [x] Add tests (Use the dummy by laraveljsonapi to integrate all features)
+- [x] Add custom actions
+- [x] Split schemas/requests/responses by action
 - [ ] Consider field attributes
   - [x] bool readonly
   - [x] bool hidden
   - [ ] closure based readonly (create/update)
   - [ ] closure based hidden
 - [ ] List sortable fields 
-- [x] Split schemas/requests/responses by action
 - [ ] Fix includes and relations
   - [x] Add relationship routes
   - [ ] Add includes 
 - [ ] Add authentication
 - [ ] Add custom queries/filters
-- [x] Add custom actions
 - [ ] Add a way to document custom actions
 - [ ] Tidy up the code!!
-- [x] Add tests (Use the dummy by laraveljsonapi to integrate all features)
-- [ ] Use interface + traits on Server/Schema to provide description etc
-- [ ] Transition to Generator classes per generated entity (paths, parameters, schemas etc)
+- [ ] Replace `cebe/php-openapi` with `goldspecdigital/oooas`
+- [ ] Move to an architecture inspired by `vyuldashev/laravel-openapi`
+- [ ] Use php8 attributes on actions/classes to generate custom docs
 
 🙏 Based upon initial prototype by [martianatwork](https://github.com/martianatwork)
 
