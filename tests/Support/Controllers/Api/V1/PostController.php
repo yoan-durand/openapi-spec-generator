@@ -17,7 +17,7 @@
 
 declare(strict_types=1);
 
-namespace LaravelJsonApi\OpenApiSpec\Tests\Support\Http\Controllers\Api\V1;
+namespace LaravelJsonApi\OpenApiSpec\Tests\Support\Controllers\Api\V1;
 
 use LaravelJsonApi\OpenApiSpec\Tests\Support\Controllers\Controller;
 use LaravelJsonApi\OpenApiSpec\Tests\Support\JsonApi\V1\Posts\PostQuery;
@@ -58,10 +58,12 @@ class PostController extends Controller
     /**
      * Publish a post.
      *
-     * @param PostSchema $schema
-     * @param PostQuery $query
-     * @param Post $post
+     * @param  PostSchema  $schema
+     * @param  PostQuery  $query
+     * @param  Post  $post
+     *
      * @return Responsable
+     * @throws \Illuminate\Auth\Access\AuthorizationException
      */
     public function publish(PostSchema $schema, PostQuery $query, Post $post): Responsable
     {

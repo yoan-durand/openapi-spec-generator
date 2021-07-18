@@ -2,7 +2,6 @@
 
 namespace LaravelJsonApi\OpenApiSpec\Tests;
 
-use LaravelJsonApi\Laravel\Http\Controllers\JsonApiController;
 use LaravelJsonApi\OpenApiSpec\OpenApiServiceProvider;
 use LaravelJsonApi\OpenApiSpec\Tests\Support\JsonApi\V1\Server;
 use Orchestra\Testbench\TestCase as BaseTestCase;
@@ -30,7 +29,7 @@ abstract class TestCase extends BaseTestCase
 
     protected function defineRoutes($router)
     {
-        $router->group(['prefix' => 'api', 'middleware' => 'api'], function() {
+        $router->group(['prefix' => 'api', 'middleware' => 'api', 'namespace' => 'LaravelJsonApi\OpenApiSpec\Tests\Support\Controllers'], function() {
             $jsonApiRoute = App::make(\LaravelJsonApi\Laravel\Routing\Registrar::class);
 
             $jsonApiRoute->server('v1')

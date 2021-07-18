@@ -2,6 +2,7 @@
 
 namespace LaravelJsonApi\OpenApiSpec\Tests\Feature;
 
+use GoldSpecDigital\ObjectOrientedOAS\Exceptions\ValidationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use LaravelJsonApi\OpenApiSpec\Facades\GeneratorFacade;
 use LaravelJsonApi\OpenApiSpec\Tests\Support\Database\Seeders\DatabaseSeeder;

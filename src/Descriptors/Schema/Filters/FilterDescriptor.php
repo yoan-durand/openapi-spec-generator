@@ -4,28 +4,30 @@
 namespace LaravelJsonApi\OpenApiSpec\Descriptors\Schema\Filters;
 
 
-use cebe\openapi\spec\Parameter;
 use LaravelJsonApi\Contracts\Schema\Filter;
-use LaravelJsonApi\Contracts\Schema\Schema;
-use LaravelJsonApi\OpenApiSpec\Actions\GenerateOpenAPISpec;
-use LaravelJsonApi\OpenApiSpec\Descriptors\Concerns\Descriptor;
 
-abstract class FilterDescriptor implements Descriptor
+use LaravelJsonApi\OpenApiSpec\Contracts\Descriptors\FilterDescriptor as FilterDescriptorContract;
+use LaravelJsonApi\OpenApiSpec\Descriptors\Descriptor;
+use LaravelJsonApi\OpenApiSpec\Generator;
+use LaravelJsonApi\OpenApiSpec\Route;
+
+abstract class FilterDescriptor extends Descriptor implements FilterDescriptorContract
 {
-    /**
-     * @param  \LaravelJsonApi\OpenApiSpec\Actions\GenerateOpenAPISpec  $generator
-     * @param  Filter  $entity
-     *
-     * @return \cebe\openapi\spec\Parameter
-     */
-    public function describe(
-      GenerateOpenAPISpec $generator,
-      Schema $schema,
-      mixed $entity
-    ): mixed {
-        return $this->describeFilter($generator,$schema, $entity);
+
+    protected Route $route;
+    protected Filter $filter;
+
+    public function __construct(Generator $generator, Route $route, Filter $filter)
+    {
+        parent::__construct($generator);
+
+        $this->route = $route;
+        $this->filter = $filter;
     }
 
-    abstract protected function describeFilter(GenerateOpenAPISpec $generator,Schema $schema, Filter $filter): ?Parameter;
-
+    /**
+     *
+     * @return string
+     */
+    abstract protected function description(): string;
 }

@@ -17,7 +17,7 @@
 
 declare(strict_types=1);
 
-namespace LaravelJsonApi\OpenApiSpec\Tests\Support\Http\Controllers\Api\V1;
+namespace LaravelJsonApi\OpenApiSpec\Tests\Support\Controllers\Api\V1;
 
 use LaravelJsonApi\Laravel\Http\Controllers\JsonApiController;
 

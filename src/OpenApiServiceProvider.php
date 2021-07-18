@@ -14,7 +14,6 @@ class OpenApiServiceProvider extends ServiceProvider
         /*
          * Optional methods to load your package assets
          */
-        // $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'getcandy');
 
         if ($this->app->runningInConsole()) {
             $this->publishes([
@@ -45,5 +44,6 @@ class OpenApiServiceProvider extends ServiceProvider
         $this->app->singleton('openapi-generator', function () {
             return new OpenApiGenerator;
         });
+
     }
 }

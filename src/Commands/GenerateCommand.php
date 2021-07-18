@@ -2,11 +2,13 @@
 
 namespace LaravelJsonApi\OpenApiSpec\Commands;
 
+use GoldSpecDigital\ObjectOrientedOAS\Exceptions\ValidationException;
 use Illuminate\Console\Command;
 use LaravelJsonApi\OpenApiSpec\Facades\GeneratorFacade;
 
 class GenerateCommand extends Command
 {
+
     /**
      * The name and signature of the console command.
      *
@@ -22,16 +24,6 @@ class GenerateCommand extends Command
     protected $description = 'Generates an Open API v3 spec';
 
     /**
-     * Create a new command instance.
-     *
-     * @return void
-     */
-    public function __construct()
-    {
-        parent::__construct();
-    }
-
-    /**
      * Execute the console command.
      *
      * @return int
@@ -41,8 +33,22 @@ class GenerateCommand extends Command
         $serverKey = $this->argument('serverKey');
 
         $this->info('Generating Open API spec...');
-
-        GeneratorFacade::generate($serverKey);
+        try {
+            GeneratorFacade::generate($serverKey);
+        } catch (ValidationException $exception) {
+            $this->error('Validation failed');
+            $this->line('Errors:');
+            collect($exception->getErrors())
+              ->map(function ($val) {
+                  return collect($val)->map(function ($val, $key) {
+                      return sprintf("%s: %s", ucfirst($key), $val);
+                  })->join("\n");
+                })->each(function ($string) {
+                  $this->line($string);
+                  $this->line("\n");
+              });
+            return 1;
+        }
 
         $this->line('Complete! /storage/app/'.$serverKey.'_openapi.yaml');
         $this->newLine();
@@ -52,4 +58,5 @@ class GenerateCommand extends Command
 
         return 0;
     }
+
 }

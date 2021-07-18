@@ -3,64 +3,44 @@
 
 namespace LaravelJsonApi\OpenApiSpec\Descriptors\Schema\Filters;
 
-
-use cebe\openapi\spec\Example;
-use cebe\openapi\spec\Parameter;
-use cebe\openapi\spec\Schema as OASchema;
-use cebe\openapi\spec\Type;
-use Exception;
-use LaravelJsonApi\Contracts\Schema\Filter;
-use LaravelJsonApi\Contracts\Schema\Schema;
-use LaravelJsonApi\Eloquent\Filters\Where as WhereFilter;
-use LaravelJsonApi\OpenApiSpec\Actions\GenerateOpenAPISpec;
+use GoldSpecDigital\ObjectOrientedOAS\Objects\Example;
+use GoldSpecDigital\ObjectOrientedOAS\Objects\Parameter;
+use GoldSpecDigital\ObjectOrientedOAS\Objects\Schema as OASchema;
 
 
 class Where extends FilterDescriptor
 {
 
-    public static function canDescribe(mixed $entity): bool
-    {
-        return $entity instanceof WhereFilter;
-    }
-
     /**
-     * @throws \cebe\openapi\exceptions\TypeErrorException
      *
      * @todo Pay attention to isSingular
      */
-    protected function describeFilter(
-      GenerateOpenAPISpec $generator,
-      Schema $schema,
-      Filter $filter
-    ): Parameter {
-        $key = $filter->key();
-        try {
-            $examples = $schema::model()::all()
-              ->pluck($key)
-              ->mapWithKeys(function ($f) {
-                  return [
-                    $f => new Example([
-                      'value' => $f,
-                    ]),
-                  ];
-              })
-              ->toArray();
-        } catch (Exception) {
-            $examples = [];
-        }
+    public function filter(): array
+    {
+        $key = $this->filter->key();
+        $examples = collect($this->generator->resources()
+          ->resources($this->route->schema()::model()))
+          ->pluck($key)
+          ->map(function ($f) {
+              // @todo Watch out for ids?
+                 return Example::create($f)->value($f);
+          })
+          ->toArray();
 
+        return [
+          Parameter::query()
+            ->name("filter[{$this->filter->key()}]")
+            ->description($this->description())
+            ->required(false)
+            ->allowEmptyValue(false)
+            ->schema(OASchema::string()->default(''))
+            ->examples(...$examples)
+        ];
+    }
 
-        return new Parameter([
-          'name' => "filter[{$filter->key()}]",
-          'description' => 'Filters the records',
-          'in' => 'query',
-          'required' => false,
-          'allowEmptyValue' => false,
-          'examples' => $examples,
-          'schema' => new OASchema([
-            "type" => Type::STRING,
-          ]),
-        ]);
+    protected function description(): string
+    {
+        return 'Filters the records';
     }
 
 }
