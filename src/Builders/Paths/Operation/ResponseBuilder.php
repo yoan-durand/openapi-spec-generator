@@ -65,7 +65,7 @@ class ResponseBuilder extends Builder
      */
     public function build(Route $route): array
     {
-        return $this->getDescriptor($route)?->response();
+        return $this->getDescriptor($route)->response();
     }
 
     /**

@@ -194,7 +194,7 @@ class Route
      */
     public function invers(): ?string
     {
-        return $this->relation()?->inverse();
+        return $this->relation() !== null ? $this->relation()->inverse() : null;
     }
 
     /**
@@ -207,7 +207,7 @@ class Route
                 throw new \LogicException("Method is not allowed for Polymorphic relationships");
             }
             return $this->server->schemas()
-              ->schemaFor($this->relation()?->inverse());
+              ->schemaFor($this->relation() !== null ? $this->relation()->inverse() : NULL);
         }
         return null;
     }
@@ -241,10 +241,11 @@ class Route
      */
     public function inverseName(bool $singular = false): ?string
     {
-        if ($singular) {
-            return Str::singular($this->relation()?->inverse());
-        }
-        return $this->relation()?->inverse();
+      $relation = $this->relation() !== NULL ? $this->relation()->inverse() : NULL;
+      if ($singular) {
+          return Str::singular($relation);
+      }
+      return $relation;
     }
 
     /**

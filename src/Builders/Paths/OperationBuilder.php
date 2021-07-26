@@ -67,7 +67,7 @@ class OperationBuilder extends Builder
      */
     public function build(SpecRoute $route): ?Operation
     {
-        return $this->getDescriptor($route)?->action();
+        return $this->getDescriptor($route) !== NULL ? $this->getDescriptor($route)->action() : NULL;
     }
 
     /**

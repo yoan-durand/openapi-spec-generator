@@ -38,7 +38,7 @@ class RequestBodyBuilder extends Builder
 
     public function build(Route $route): ?RequestBody
     {
-        return $this->getDescriptor($route)?->request();
+        return $this->getDescriptor($route) !== NULL ? $this->getDescriptor($route)->request() : NULL;
     }
 
     /**

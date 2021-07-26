@@ -15,5 +15,5 @@ interface PaginationDescriptor extends Descriptor
      *
      * @return mixed
      */
-    public function pagination(Route $route): mixed;
+    public function pagination(Route $route);
 }

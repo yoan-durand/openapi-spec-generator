@@ -35,7 +35,7 @@ trait ResolvesActionTraitToDescriptor
             return null;
         }
 
-        return $traitMethod?->getDeclaringClass()->name;
+        return $traitMethod !== NULL ? $traitMethod->getDeclaringClass()->name : NULL;
     }
 
 }

@@ -96,7 +96,7 @@ class ComponentsContainer
           ->responses(...$this->responses)
           ->parameters(...$this->parameters)
           ->requestBodies(...$this->requestBodies)
-          ->schemas(...$schemas);
+          ->schemas(...array_values($schemas));
     }
 
     /**
@@ -107,16 +107,27 @@ class ComponentsContainer
     protected function ref(BaseObject $object): BaseObject
     {
 
-        $baseRef = match (true) {
-            $object instanceof Parameter => '#/components/parameters/',
-            $object instanceof RequestBody => '#/components/requestBodies/',
-            $object instanceof Response => '#/components/responses/',
-            $object instanceof SchemaContract => '#/components/schemas/',
-            $object instanceof SecurityScheme => '#/components/securitySchemes/',
-            default => die($object::class)
+        switch (true) {
+          case $object instanceof Parameter:
+             $baseRef = '#/components/parameters/';
+             break;
+          case $object instanceof RequestBody:
+             $baseRef = '#/components/requestBodies/';
+             break;
+          case $object instanceof Response:
+             $baseRef = '#/components/responses/';
+             break;
+          case $object instanceof SchemaContract:
+             $baseRef = '#/components/schemas/';
+             break;
+          case $object instanceof SecurityScheme:
+             $baseRef = '#/components/securitySchemes/';
+             break;
+          default:
+            die(get_class($object));
         };
 
-        return $object::class::ref($baseRef.$object->objectId,
+        return $object::ref($baseRef.$object->objectId,
           $object->objectId);
     }
 
