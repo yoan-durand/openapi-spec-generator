@@ -47,7 +47,7 @@ class ParameterBuilder extends Builder
               ->map(function ($resource) {
                   $id = $resource->id();
                   return Example::create($id)->value($id);
-              })->toArray();
+              })->take(3)->toArray();
 
             $parameters[] = Parameter::path($id)
               ->name($id)
