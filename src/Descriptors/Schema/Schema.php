@@ -408,7 +408,7 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
                   $schema = $schema->readOnly(true);
               }
               return $schema;
-          })->take(3)->toArray();
+          })->toArray();
     }
 
     /**

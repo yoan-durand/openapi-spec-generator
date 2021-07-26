@@ -65,7 +65,7 @@ class ResourceContainer
         if(method_exists($model, 'all')){
             $resources = $model::all()->map(function ($model) {
                 return $this->server->resources()->create($model);
-            });
+            })->take(3);
 
             $this->resources[$model] = $resources;
         }
