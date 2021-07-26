@@ -95,7 +95,7 @@ class Route
         }
 
         $this->uri = str_replace(
-          $this->server->baseUri(),
+          $this->server->url(),
           '',
           '/'.$route->uri()
         );
