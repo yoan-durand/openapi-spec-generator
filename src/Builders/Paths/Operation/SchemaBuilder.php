@@ -111,20 +111,28 @@ class SchemaBuilder extends Builder
         if ($method !== 'showRelated' && $route->isRelation()) {
             $schema = $descriptor->fetchRelationship($route);
         } else {
-            $schema = match ($method) {
-                'index', 'show', 'store', 'update' => $descriptor->fetch(
+            switch ($method) {
+              case 'index':
+              case 'show':
+              case 'store':
+              case 'update':
+                $schema = $descriptor->fetch(
                   $route->schema(),
                   $objectId,
                   $route->resource(),
                   $route->name(true)
-                ),
-                'showRelated' => $descriptor->fetch(
+                );
+                break;
+              case 'showRelated':
+                $schema = $descriptor->fetch(
                   $route->inversSchema(),
                   $objectId,
-                  $route->relation()?->inverse(),
+                  $route->relation() !== null ? $route->relation()->inverse() : null,
                   $route->inverseName(true)
-                ),
-                default => die($method) // @todo Add proper Exception
+                );
+                break;
+              default:
+                die($method); // @todo Add proper Exception
             };
         }
 
@@ -147,17 +155,29 @@ class SchemaBuilder extends Builder
 
         $method = $route->action();
         if ($route->isRelation()) {
-            $schema = match ($method) {
-                'update' => $descriptor->updateRelationship($route),
-                'attach' => $descriptor->attachRelationship($route),
-                'detach' => $descriptor->detachRelationship($route),
-                default => die("Request ".$method) // @todo Add proper Exception
-            };
+            switch ($method) {
+                case 'update':
+                  $schema = $descriptor->updateRelationship($route);
+                  break;
+                case 'attach':
+                  $schema = $descriptor->attachRelationship($route);
+                  break;
+                case 'detach':
+                  $schema = $descriptor->detachRelationship($route);
+                  break;
+                default:
+                  die("Request ".$method); // @todo Add proper Exception
+            }
         } else {
-            $schema = match ($method) {
-                'store' => $descriptor->store($route),
-                'update' => $descriptor->update($route),
-                default => die("Request ".$method) // @todo Add proper Exception
+            switch ($method) {
+                case 'store':
+                  $schema = $descriptor->store($route);
+                  break;
+                case 'update':
+                  $schema = $descriptor->update($route);
+                  break;
+                default:
+                  die("Request ".$method); // @todo Add proper Exception
             };
         }
 
@@ -181,12 +201,22 @@ class SchemaBuilder extends Builder
             $resource = $route->resource();
         } else {
 
-            $method = match ($route->action()) {
-                'index', 'show', 'showRelated', 'store', 'update', 'attach', 'detach' => 'fetch',
-                default => $route->action()
+            switch ($route->action()) {
+              case 'index':
+              case 'show':
+              case 'showRelated':
+              case 'store':
+              case 'update':
+              case 'attach':
+              case 'detach':
+                $method = 'fetch';
+                break;
+              default:
+                $method = $route->action();
             };
 
-            $resource = $route->action() === 'showRelated' ? $route->relation()?->inverse() : $route->resource();
+
+            $resource = $route->action() === 'showRelated' ? $route->relation()->inverse() : $route->resource();
         }
 
         if ($route->isPolymorphic() && $route->action() === 'showRelated') {

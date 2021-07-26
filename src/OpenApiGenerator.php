@@ -14,7 +14,8 @@ class OpenApiGenerator
     public function generate(string $serverKey): string
         {
 
-            $openapi = (new Generator($serverKey))->generate();
+          $generator = new Generator($serverKey);
+          $openapi = $generator->generate();
 
             $openapi->validate();
 

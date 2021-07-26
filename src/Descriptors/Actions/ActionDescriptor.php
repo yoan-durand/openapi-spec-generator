@@ -33,7 +33,7 @@ abstract class ActionDescriptor implements ActionDescriptorContract
       RequestBodyBuilder $requestBodyBuilder,
       ResponseBuilder $responseBuilder,
       Generator $generator,
-      Route $route,
+      Route $route
     ) {
         $this->parameterBuilder = $parameterBuilder;
         $this->requestBodyBuilder = $requestBodyBuilder;
@@ -49,12 +49,21 @@ abstract class ActionDescriptor implements ActionDescriptorContract
      */
     public function action(): Operation
     {
-        $operation = match ($this->route->method()) {
-            'GET' => Operation::get(),
-            'POST' => Operation::post(),
-            'PATCH' => Operation::patch(),
-            'DELETE' => Operation::delete(),
-        };
+        switch ($this->route->method()) {
+          case 'POST':
+            $operation = Operation::post();
+            break;
+          case 'PATCH':
+            $operation = Operation::patch();
+            break;
+          case 'DELETE':
+            $operation = Operation::delete();
+            break;
+          case 'GET':
+          default:
+            $operation = Operation::get();
+            break;
+        }
 
         return $operation
           ->operationId($this->route->id())

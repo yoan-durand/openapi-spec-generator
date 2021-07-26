@@ -159,8 +159,9 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
               ->resource(Arr::first($route->inversSchemas())::model());
         }
 
-        return $this->relationshipData($route->relation(), $resource,
-          $route->relation()?->inverse())
+      $inverseRelation = $route->relation() !== null ? $route->relation()->inverse() : null;
+      return $this->relationshipData($route->relation(), $resource,
+        $inverseRelation)
           ->title('Resource/'.ucfirst($route->name(true)).'/Relationship/'.ucfirst($route->relationName()).'/Fetch');
     }
 
@@ -178,8 +179,9 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
               ->resource(Arr::first($route->inversSchemas())::model());
         }
 
+      $inverseRelation = $route->relation() !== null ? $route->relation()->inverse() : null;
         return $this->relationshipData($route->relation(), $resource,
-          $route->relation()?->inverse())
+          $inverseRelation)
           ->title('Resource/'.ucfirst($route->name(true)).'/Relationship/'.ucfirst($route->relationName()).'/Update');
     }
 
@@ -197,8 +199,9 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
               ->resource(Arr::first($route->inversSchemas())::model());
         }
 
+      $inverseRelation = $route->relation() !== null ? $route->relation()->inverse() : null;
         return $this->relationshipData($route->relation(), $resource,
-          $route->relation()?->inverse())
+          $inverseRelation)
           ->title('Resource/'.ucfirst($route->name(true)).'/Relationship/'.ucfirst($route->relationName()).'/Attach');
     }
 
@@ -215,9 +218,9 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
             $resource = $this->generator->resources()
               ->resource(Arr::first($route->inversSchemas())::model());
         }
-
+      $inverseRelation = $route->relation() !== null ? $route->relation()->inverse() : null;
         return $this->relationshipData($route->relation(), $resource,
-          $route->relation()?->inverse())
+          $inverseRelation)
           ->title('Resource/'.ucfirst($route->name(true)).'/Relationship/'.ucfirst($route->relationName()).'/Detach');
     }
 
@@ -231,8 +234,9 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
         $resource = $this->generator->resources()
           ->resource($route->schema()::model());
 
+        $inverseRelation = $route->relation() !== null ? $route->relation()->inverse() : null;
         return $this->relationshipData($route->relation(), $resource,
-          $route->relation()?->inverse())
+          $inverseRelation)
           ->objectId($objectId)
           ->title('Resource/'.ucfirst($route->name(true)).'/Relationship/'.ucfirst($route->relationName()).'/Fetch');
     }
@@ -323,8 +327,8 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
         return collect($route->schema()->filters())
           ->map(function (Eloquent\Contracts\Filter $filterInstance) use ($route
           ) {
-              return (new ($this->getDescriptor($filterInstance))($this->generator,
-                $route, $filterInstance))->filter();
+            $descriptor = $this->getDescriptor($filterInstance);
+            return (new $descriptor($this->generator, $route, $filterInstance))->filter();
           })
           ->flatten()
           ->toArray();
@@ -342,19 +346,27 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
     ): Collection {
         return collect($fields)
           ->mapToGroups(function (Field $field) {
-              $key = match (true) {
-                  $field instanceof Attribute => 'attributes',
-                  $field instanceof Relation => 'relationships',
-                  default => 'unknown'
-              };
-              return [$key => $field];
+              switch (true) {
+                case $field instanceof Attribute:
+                  $key = 'attributes';
+                  break;
+                case $field instanceof Relation:
+                  $key = 'relationships';
+                  break;
+                default:
+                  $key = 'unknown';
+                }
+                return [$key => $field];
           })
           ->map(function ($fields, $type) use ($resource) {
-              return match ($type) {
-                  'attributes' => $this->attributes($fields, $resource),
-                  'relationships' => $this->relationships($fields, $resource),
-                  default => null
-              };
+              switch ($type) {
+                case 'attributes':
+                  return $this->attributes($fields, $resource);
+                case 'relationships':
+                  return $this->relationships($fields, $resource);
+                default:
+                  return null;
+              }
           });
     }
 
@@ -369,14 +381,25 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
           ->filter(fn($field) => ! ($field instanceof ID))
           ->map(function (Field $field) use ($example) {
               $fieldId = $field->name();
-              $schema = (match (true) {
-                  $field instanceof Boolean => OASchema::boolean($fieldId),
-                  $field instanceof Number => OASchema::number($fieldId),
-                  $field instanceof ArrayList => OASchema::array($fieldId),
-                  $field instanceof ArrayHash,
-                    $field instanceof Map => OASchema::object($fieldId),
-                  default => OASchema::string($fieldId)
-              })->title($field->name());
+              switch (true) {
+                case $field instanceof Boolean:
+                    $fieldDataType = OASchema::boolean($fieldId);
+                    break;
+                case $field instanceof Number:
+                    $fieldDataType = OASchema::number($fieldId);
+                    break;
+                case $field instanceof ArrayList:
+                    $fieldDataType = OASchema::array($fieldId);
+                    break;
+                case $field instanceof ArrayHash:
+                case $field instanceof Map:
+                   $fieldDataType = OASchema::object($fieldId);
+                   break;
+                default:
+                  $fieldDataType = OASchema::string($fieldId);
+              }
+
+              $schema = $fieldDataType->title($field->name());
 
               if (isset($example[$field->name()])) {
                   $schema = $schema->example($example[$field->name()]);
@@ -407,7 +430,7 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
     }
 
     /**
-     * @param  \LaravelJsonApi\Eloquent\Fields\Relations\Relation  $relation
+     * @param \LaravelJsonApi\Eloquent\Fields\Relations\Relation $relation
      * @param  \LaravelJsonApi\Core\Resources\JsonApiResource  $example
      * @param  bool  $includeData
      *
@@ -415,7 +438,7 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
      * @throws \GoldSpecDigital\ObjectOrientedOAS\Exceptions\InvalidArgumentException
      */
     protected function relationship(
-      mixed $relation,
+      Relation $relation,
       JsonApiResource $example,
       bool $includeData = false
     ): OASchema {
@@ -442,7 +465,7 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
     }
 
     /**
-     * @param  \LaravelJsonApi\Eloquent\Fields\Relations\Relation  $relation
+     * @param \LaravelJsonApi\Eloquent\Fields\Relations\Relation $relation
      * @param  \LaravelJsonApi\Core\Resources\JsonApiResource  $example
      * @param  string  $type
      *
@@ -450,7 +473,7 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
      * @throws \GoldSpecDigital\ObjectOrientedOAS\Exceptions\InvalidArgumentException
      */
     protected function relationshipData(
-      mixed $relation,
+      Relation $relation,
       JsonApiResource $example,
       string $type
     ): OASchema {
@@ -493,7 +516,7 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
      * @return \GoldSpecDigital\ObjectOrientedOAS\Objects\Schema
      */
     public function relationshipLinks(
-      mixed $relation,
+      $relation,
       JsonApiResource $example,
       string $type
     ): OASchema {

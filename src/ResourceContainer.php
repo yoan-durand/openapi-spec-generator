@@ -26,7 +26,7 @@ class ResourceContainer
      *
      * @return \LaravelJsonApi\Core\Resources\JsonApiResource
      */
-    public function resource(mixed $model): JsonApiResource{
+    public function resource($model): JsonApiResource{
         $fqn = $this->getFQN($model);
         if(!isset($this->resource[$fqn])){
             $this->loadResources($fqn);
@@ -39,7 +39,7 @@ class ResourceContainer
      *
      * @return JsonApiResource[]
      */
-    public function resources(mixed $model): array{
+    public function resources($model): array{
         $fqn = $this->getFQN($model);
         if(!isset($this->resource[$fqn])){
             $this->loadResources($fqn);
@@ -47,13 +47,13 @@ class ResourceContainer
         return $this->resources[$fqn]->toArray();
     }
 
-    protected function getFQN(mixed $model): string{
+    protected function getFQN($model): string{
         $fqn = $model;
         if($model instanceof Schema){
             $fqn = $model::model();
         }
         else if(is_object($model)) {
-            $fqn = $model::class;
+            $fqn = get_class($model);
         }
         return $fqn;
     }

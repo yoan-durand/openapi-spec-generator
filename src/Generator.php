@@ -36,7 +36,11 @@ class Generator
     {
         $this->key = $key;
 
-        $this->server = new (config("jsonapi.servers.$key"))(app(), $this->key);
+        $apiServer = config("jsonapi.servers.$key");
+        $app = app();
+
+
+        $this->server = new $apiServer($app, $this->key);
 
         $this->infoBuilder = new InfoBuilder($this);
         $this->serverBuilder = new ServerBuilder($this);
@@ -54,7 +58,7 @@ class Generator
           ->openapi(OpenApi::OPENAPI_3_0_2)
           ->info($this->infoBuilder->build())
           ->servers(...$this->serverBuilder->build())
-          ->paths(...$this->pathsBuilder->build())
+          ->paths(...array_values($this->pathsBuilder->build()))
           ->components($this->components()->components());
     }
 
