@@ -11,20 +11,23 @@ class OpenApiGenerator
     /**
      * @throws \GoldSpecDigital\ObjectOrientedOAS\Exceptions\ValidationException
      */
-    public function generate(string $serverKey): string
+    public function generate(string $serverKey, string $format = 'yaml'): string
         {
 
           $generator = new Generator($serverKey);
           $openapi = $generator->generate();
 
-            $openapi->validate();
+          $openapi->validate();
 
-            $yaml = Yaml::dump($openapi->toArray());
-
-
+          if ($format === 'yaml') {
+            $output = Yaml::dump($openapi->toArray());
             // Save to storage
-            Storage::put($serverKey.'_openapi.yaml', $yaml);
+            Storage::put($serverKey.'_openapi.yaml', $output);
+          } elseif ($format === 'json') {
+            $output = json_encode($openapi->toArray(), JSON_PRETTY_PRINT);
+            Storage::put($serverKey.'_openapi.json', $output);
+          }
 
-            return $yaml;
+          return $output;
         }
 }

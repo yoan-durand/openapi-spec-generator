@@ -22,9 +22,18 @@ class GenerateTest extends TestCase
 
     public function test_spec_is_yaml()
     {
-        $openapiYaml = GeneratorFacade::generate('v1');
+        $openapiYaml = GeneratorFacade::generate('v1', 'yaml');
 
         $spec = Yaml::parse($openapiYaml);
+
+        $this->assertEquals('My JSON:API', $spec['info']['title']);
+    }
+
+    public function test_spec_is_json()
+    {
+        $output = GeneratorFacade::generate('v1', 'json');
+
+        $spec = json_decode($output);
 
         $this->assertEquals('My JSON:API', $spec['info']['title']);
     }
