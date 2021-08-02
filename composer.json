@@ -15,7 +15,7 @@
     ],
     "license": "Apache-2.0",
     "require": {
-        "php": "^7.4",
+        "php": ">=7.4|^8.0",
         "laravel-json-api/hashids": "^1.0@beta",
         "goldspecdigital/oooas": "^2.8",
         "justinrainbow/json-schema": "^5.2",
