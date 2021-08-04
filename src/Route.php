@@ -94,10 +94,11 @@ class Route
             $this->action = $action;
         }
 
+
         $this->uri = str_replace(
-          $this->server->url(),
+          $route->getPrefix(),
           '',
-          '/'.$route->uri()
+          $route->uri()
         );
 
         [$controller, $method] = explode('@', $this->route->getActionName(), 2);
