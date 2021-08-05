@@ -14,7 +14,7 @@ class GenerateCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'jsonapi:openapi:generate {serverKey} {format=yaml}';
+    protected $signature = 'jsonapi:openapi:generate {serverKey} {format=json}';
 
 
     /**
