@@ -33,7 +33,7 @@ class GenerateTest extends TestCase
     {
         $output = GeneratorFacade::generate('v1', 'json');
 
-        $spec = json_decode($output);
+        $spec = json_decode($output, true);
 
         $this->assertEquals('My JSON:API', $spec['info']['title']);
     }
