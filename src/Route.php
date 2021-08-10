@@ -96,7 +96,7 @@ class Route
         }
 
         $this->setUriForRoute();
-
+      
         [$controller, $method] = explode('@', $this->route->getActionName(), 2);
 
         $this->controller = $controller;

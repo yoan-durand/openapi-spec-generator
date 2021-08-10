@@ -22,9 +22,18 @@ class GenerateTest extends TestCase
 
     public function test_spec_is_yaml()
     {
-        $openapiYaml = GeneratorFacade::generate('v1');
+        $openapiYaml = GeneratorFacade::generate('v1', 'yaml');
 
         $spec = Yaml::parse($openapiYaml);
+
+        $this->assertEquals('My JSON:API', $spec['info']['title']);
+    }
+
+    public function test_spec_is_json()
+    {
+        $output = GeneratorFacade::generate('v1', 'json');
+
+        $spec = json_decode($output, true);
 
         $this->assertEquals('My JSON:API', $spec['info']['title']);
     }
@@ -49,6 +58,7 @@ class GenerateTest extends TestCase
       $spec = Yaml::parse($openapiYaml);
 
       $this->assertArrayHasKey('/posts', $spec['paths'], 'Path to resource is not replaced correctly.');
+      
       $this->assertArrayHasKey('/posts/{post}/relationships/author', $spec['paths'], 'Path to resource is not replaced correctly.');
 
       $this->assertEquals('http://localhost/api/v1', $spec['servers'][0]['variables']['serverUrl']['default']);

@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * Class GeneratorFacade
- * @method static bool generate(string $serverKey)
+ * @method static bool generate(string $serverKey, string $format = 'yaml')
  */
 class GeneratorFacade extends Facade
 {
