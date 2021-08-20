@@ -8,9 +8,9 @@ use Illuminate\Routing\Route as IlluminateRoute;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use LaravelJsonApi\Contracts\Schema\PolymorphicRelation;
-use LaravelJsonApi\Contracts\Schema\Relation;
 use LaravelJsonApi\Contracts\Schema\Schema;
 use LaravelJsonApi\Contracts\Server\Server;
+use LaravelJsonApi\Eloquent\Fields\Relations\Relation;
 
 class Route
 {
@@ -96,7 +96,7 @@ class Route
         }
 
         $this->setUriForRoute();
-      
+
         [$controller, $method] = explode('@', $this->route->getActionName(), 2);
 
         $this->controller = $controller;
@@ -162,12 +162,18 @@ class Route
     }
 
     /**
-     * @return \LaravelJsonApi\Contracts\Schema\Relation|null
+     * @return \LaravelJsonApi\Eloquent\Fields\Relations\Relation|null
      */
     public function relation(): ?Relation
     {
-        return $this->relation ? $this->schema()
+        $relation =  $this->relation ? $this->schema()
           ->relationship($this->relation) : null;
+
+        if ($relation !== null && !($relation instanceof Relation)) {
+            throw new \RuntimeException("Unexpected Type");
+        }
+
+        return $relation;
     }
 
     /**

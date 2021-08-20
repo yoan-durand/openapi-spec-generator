@@ -179,10 +179,22 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
               ->resource(Arr::first($route->inversSchemas())::model());
         }
 
-      $inverseRelation = $route->relation() !== null ? $route->relation()->inverse() : null;
-        return $this->relationshipData($route->relation(), $resource,
-          $inverseRelation)
-          ->title('Resource/'.ucfirst($route->name(true)).'/Relationship/'.ucfirst($route->relationName()).'/Update');
+        $inverseRelation = $route->relation() !== null ? $route->relation()->inverse() : null;
+        $relation = $route->relation();
+
+        $dataSchema = $this
+          ->relationshipData(
+            $relation,
+            $resource,
+            $inverseRelation
+          );
+
+        if ($relation instanceof Eloquent\Fields\Relations\ToMany) {
+            $dataSchema = OASchema::array('data')
+              ->items($dataSchema);
+        }
+
+        return $dataSchema->title('Resource/'.ucfirst($route->name(true)).'/Relationship/'.ucfirst($route->relationName()).'/Update');
     }
 
     /**
@@ -199,10 +211,23 @@ class Schema extends Descriptor implements SchemaDescriptor, SortablesDescriptor
               ->resource(Arr::first($route->inversSchemas())::model());
         }
 
-      $inverseRelation = $route->relation() !== null ? $route->relation()->inverse() : null;
-        return $this->relationshipData($route->relation(), $resource,
-          $inverseRelation)
-          ->title('Resource/'.ucfirst($route->name(true)).'/Relationship/'.ucfirst($route->relationName()).'/Attach');
+        $inverseRelation = $route->relation() !== null ? $route->relation()->inverse() : null;
+
+        $relation = $route->relation();
+
+        $dataSchema = $this
+          ->relationshipData(
+            $relation,
+            $resource,
+            $inverseRelation
+          );
+
+        if ($relation instanceof Eloquent\Fields\Relations\ToMany) {
+            $dataSchema = OASchema::array('data')
+              ->items($dataSchema);
+        }
+
+        return $dataSchema->title('Resource/'.ucfirst($route->name(true)).'/Relationship/'.ucfirst($route->relationName()).'/Attach');
     }
 
     /**
