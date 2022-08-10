@@ -16,14 +16,14 @@
     "license": "Apache-2.0",
     "require": {
         "php": ">=7.4|^8.0",
-        "laravel-json-api/hashids": "^1.0@beta",
-        "goldspecdigital/oooas": "^2.8",
+        "laravel-json-api/hashids": "^v1.1.0",
+        "goldspecdigital/oooas": "^v2.10",
         "justinrainbow/json-schema": "^5.2",
-        "symfony/yaml": "^5.3"
+        "symfony/yaml": "^6.1"
     },
     "require-dev": {
-        "laravel-json-api/laravel": "^1.0",
-        "orchestra/testbench": "^6.9",
+        "laravel-json-api/laravel": "^v2.4",
+        "orchestra/testbench": "^v7.6",
         "phpunit/phpunit": "^9.5",
         "ext-json": "*"
     },

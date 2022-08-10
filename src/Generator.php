@@ -6,6 +6,7 @@ namespace LaravelJsonApi\OpenApiSpec;
 
 use GoldSpecDigital\ObjectOrientedOAS\OpenApi;
 use LaravelJsonApi\Contracts\Server\Server;
+use LaravelJsonApi\Core\Support\AppResolver;
 use LaravelJsonApi\OpenApiSpec\Builders\InfoBuilder;
 use LaravelJsonApi\OpenApiSpec\Builders\PathsBuilder;
 use LaravelJsonApi\OpenApiSpec\Builders\ServerBuilder;
@@ -39,8 +40,7 @@ class Generator
         $apiServer = config("jsonapi.servers.$key");
         $app = app();
 
-
-        $this->server = new $apiServer($app, $this->key);
+        $this->server = new $apiServer(new AppResolver(static fn() => $app), $this->key);
 
         $this->infoBuilder = new InfoBuilder($this);
         $this->serverBuilder = new ServerBuilder($this);
